@@ -2,9 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import AgeGate from "./components/AgeGate";
 import AuthGate from "./components/AuthGate";
+import UserPanel from "./components/UserPanel";
 import { createClient } from "../lib/supabase";
-
-const SUPABASE_AUDIO_URL = "https://jctuuyvpchzrntgqvmsoj.supabase.co/storage/v1/object/public/audio";
 
 const tracks = [
   { id: 1, title: "Midnight Confession", creator: "VelvetVoice", duration: "18:42", category: "Romance", plays: "142K", isNew: false, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
@@ -40,6 +39,8 @@ export default function Home() {
   const [activeNav, setActiveNav] = useState("home");
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [history, setHistory] = useState([]); // track ids, most recent first
 
   const audioRef = useRef(null);
 
@@ -48,6 +49,7 @@ export default function Home() {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
   }, []);
+  const handleSignOut = useCallback(() => setUser(null), []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -60,22 +62,15 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Set up audio element once
   useEffect(() => {
     const audio = new Audio();
     audioRef.current = audio;
-
     audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
     audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
     audio.addEventListener("ended", () => setPlaying(false));
-
-    return () => {
-      audio.pause();
-      audio.src = "";
-    };
+    return () => { audio.pause(); audio.src = ""; };
   }, []);
 
-  // React to activeTrack changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !activeTrack) return;
@@ -86,15 +81,11 @@ export default function Home() {
     if (playing) audio.play().catch(() => {});
   }, [activeTrack]);
 
-  // React to playing state changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) {
-      audio.play().catch(() => setPlaying(false));
-    } else {
-      audio.pause();
-    }
+    if (playing) audio.play().catch(() => setPlaying(false));
+    else audio.pause();
   }, [playing]);
 
   const handlePlay = (track) => {
@@ -103,6 +94,7 @@ export default function Home() {
     } else {
       setActiveTrack(track);
       setPlaying(true);
+      setHistory(h => [track.id, ...h.filter(id => id !== track.id)].slice(0, 20));
     }
   };
 
@@ -110,8 +102,7 @@ export default function Home() {
     const audio = audioRef.current;
     if (!audio || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    const newTime = pct * duration;
+    const newTime = ((e.clientX - rect.left) / rect.width) * duration;
     audio.currentTime = newTime;
     setCurrentTime(newTime);
   };
@@ -122,6 +113,7 @@ export default function Home() {
     const prev = tracks[(idx - 1 + tracks.length) % tracks.length];
     setActiveTrack(prev);
     setPlaying(true);
+    setHistory(h => [prev.id, ...h.filter(id => id !== prev.id)].slice(0, 20));
   };
 
   const handleNext = () => {
@@ -130,6 +122,7 @@ export default function Home() {
     const next = tracks[(idx + 1) % tracks.length];
     setActiveTrack(next);
     setPlaying(true);
+    setHistory(h => [next.id, ...h.filter(id => id !== next.id)].slice(0, 20));
   };
 
   const filteredTracks = activeCategory === "All"
@@ -139,12 +132,25 @@ export default function Home() {
   const currentTrack = activeTrack || tracks[2];
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
+  const initials = (user?.user_metadata?.full_name || user?.email || "?")
+    .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
   if (user === undefined) return null;
 
   return (
     <>
       {!ageConfirmed && <AgeGate onConfirm={handleAgeConfirm} />}
       {ageConfirmed && !user && <AuthGate onAuth={handleAuth} />}
+      {panelOpen && user && (
+        <UserPanel
+          user={user}
+          liked={liked}
+          tracks={tracks}
+          history={history}
+          onClose={() => setPanelOpen(false)}
+          onSignOut={handleSignOut}
+        />
+      )}
     <div style={{
       fontFamily: "Georgia, 'Times New Roman', serif",
       background: "#0d0b08",
@@ -160,6 +166,7 @@ export default function Home() {
         .nav-item:hover { color: #c9a96e !important; }
         .cat-pill:hover { border-color: #c9a96e !important; color: #c9a96e !important; }
         .card:hover { transform: translateY(-3px); }
+        .avatar-btn:hover { box-shadow: 0 0 16px rgba(201,169,110,0.4) !important; }
         @keyframes wave {
           from { transform: scaleY(0.4); }
           to { transform: scaleY(1); }
@@ -197,13 +204,27 @@ export default function Home() {
             }}>{nav}</button>
           ))}
         </div>
-        <button style={{
-          background: "linear-gradient(135deg, #c9a96e, #a07840)",
-          border: "none", borderRadius: "20px",
-          padding: "8px 20px", color: "#0d0b08",
-          fontSize: "11px", letterSpacing: "0.1em",
-          fontWeight: "bold", cursor: "pointer", fontFamily: "inherit",
-        }}>PREMIUM</button>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {user && (
+            <button className="avatar-btn" onClick={() => setPanelOpen(true)} style={{
+              width: "34px", height: "34px", borderRadius: "50%",
+              background: "linear-gradient(135deg, #c9a96e, #8c6030)",
+              border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "12px", fontWeight: "bold", color: "#0a0806",
+              fontFamily: "inherit",
+              boxShadow: "0 0 10px rgba(201,169,110,0.2)",
+              transition: "box-shadow 0.2s",
+            }}>{initials}</button>
+          )}
+          <button style={{
+            background: "linear-gradient(135deg, #c9a96e, #a07840)",
+            border: "none", borderRadius: "20px",
+            padding: "8px 20px", color: "#0d0b08",
+            fontSize: "11px", letterSpacing: "0.1em",
+            fontWeight: "bold", cursor: "pointer", fontFamily: "inherit",
+          }}>PREMIUM</button>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: "28px 28px 120px" }}>
