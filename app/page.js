@@ -1,16 +1,18 @@
 'use client';
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import AgeGate from "./components/AgeGate";
 import AuthGate from "./components/AuthGate";
 import { createClient } from "../lib/supabase";
 
+const SUPABASE_AUDIO_URL = "https://jctuuyvpchzrntgqvmsoj.supabase.co/storage/v1/object/public/audio";
+
 const tracks = [
-  { id: 1, title: "Midnight Confession", creator: "VelvetVoice", duration: "18:42", category: "Romance", plays: "142K", isNew: false, isPremium: false },
-  { id: 2, title: "The Long Weekend", creator: "SilkTones", duration: "32:15", category: "Slow Burn", plays: "98K", isNew: true, isPremium: false },
-  { id: 3, title: "After Hours", creator: "DeepAmber", duration: "24:08", category: "Intense", plays: "211K", isNew: false, isPremium: true },
-  { id: 4, title: "Strangers on a Train", creator: "NightReads", duration: "41:00", category: "Narrative", plays: "76K", isNew: false, isPremium: false },
-  { id: 5, title: "Breathless", creator: "VelvetVoice", duration: "15:30", category: "Romance", plays: "183K", isNew: true, isPremium: true },
-  { id: 6, title: "The Cabin", creator: "WarmHarbour", duration: "28:44", category: "Slow Burn", plays: "54K", isNew: false, isPremium: false },
+  { id: 1, title: "Midnight Confession", creator: "VelvetVoice", duration: "18:42", category: "Romance", plays: "142K", isNew: false, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+  { id: 2, title: "The Long Weekend", creator: "SilkTones", duration: "32:15", category: "Slow Burn", plays: "98K", isNew: true, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+  { id: 3, title: "After Hours", creator: "DeepAmber", duration: "24:08", category: "Intense", plays: "211K", isNew: false, isPremium: true, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+  { id: 4, title: "Strangers on a Train", creator: "NightReads", duration: "41:00", category: "Narrative", plays: "76K", isNew: false, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+  { id: 5, title: "Breathless", creator: "VelvetVoice", duration: "15:30", category: "Romance", plays: "183K", isNew: true, isPremium: true, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+  { id: 6, title: "The Cabin", creator: "WarmHarbour", duration: "28:44", category: "Slow Burn", plays: "54K", isNew: false, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
 ];
 
 const featured = [
@@ -21,6 +23,13 @@ const featured = [
 
 const categories = ["All", "Romance", "Slow Burn", "Intense", "Narrative", "ASMR", "Couples"];
 
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 export default function Home() {
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [user, setUser] = useState(undefined);
@@ -28,8 +37,11 @@ export default function Home() {
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState({});
   const [activeCategory, setActiveCategory] = useState("All");
-  const [progress, setProgress] = useState(34);
   const [activeNav, setActiveNav] = useState("home");
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const audioRef = useRef(null);
 
   const handleAgeConfirm = useCallback(() => setAgeConfirmed(true), []);
   const handleAuth = useCallback(() => {
@@ -48,14 +60,41 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Set up audio element once
   useEffect(() => {
-    let interval;
+    const audio = new Audio();
+    audioRef.current = audio;
+
+    audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
+    audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
+    audio.addEventListener("ended", () => setPlaying(false));
+
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, []);
+
+  // React to activeTrack changes
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !activeTrack) return;
+    audio.src = activeTrack.audioUrl;
+    audio.load();
+    setCurrentTime(0);
+    setDuration(0);
+    if (playing) audio.play().catch(() => {});
+  }, [activeTrack]);
+
+  // React to playing state changes
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
     if (playing) {
-      interval = setInterval(() => {
-        setProgress(p => (p >= 100 ? 0 : p + 0.1));
-      }, 200);
+      audio.play().catch(() => setPlaying(false));
+    } else {
+      audio.pause();
     }
-    return () => clearInterval(interval);
   }, [playing]);
 
   const handlePlay = (track) => {
@@ -64,8 +103,33 @@ export default function Home() {
     } else {
       setActiveTrack(track);
       setPlaying(true);
-      setProgress(0);
     }
+  };
+
+  const handleSeek = (e) => {
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    const newTime = pct * duration;
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handlePrev = () => {
+    if (!activeTrack) return;
+    const idx = tracks.findIndex(t => t.id === activeTrack.id);
+    const prev = tracks[(idx - 1 + tracks.length) % tracks.length];
+    setActiveTrack(prev);
+    setPlaying(true);
+  };
+
+  const handleNext = () => {
+    if (!activeTrack) return;
+    const idx = tracks.findIndex(t => t.id === activeTrack.id);
+    const next = tracks[(idx + 1) % tracks.length];
+    setActiveTrack(next);
+    setPlaying(true);
   };
 
   const filteredTracks = activeCategory === "All"
@@ -73,6 +137,7 @@ export default function Home() {
     : tracks.filter(t => t.category === activeCategory);
 
   const currentTrack = activeTrack || tracks[2];
+  const progress = duration ? (currentTime / duration) * 100 : 0;
 
   if (user === undefined) return null;
 
@@ -189,7 +254,7 @@ export default function Home() {
           <span>#</span><span>TITLE</span><span>CREATOR</span><span>CATEGORY</span><span>DURATION</span><span></span>
         </div>
 
-        {filteredTracks.map((track, i) => {
+        {filteredTracks.map((track) => {
           const isActive = activeTrack?.id === track.id;
           const isPlaying = isActive && playing;
           return (
@@ -253,21 +318,20 @@ export default function Home() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ fontSize: "11px", color: "#555", minWidth: "36px" }}>
-            {Math.floor(progress / 100 * 18)}:{String(Math.floor((progress / 100 * 42) % 60)).padStart(2, "0")}
+            {formatTime(currentTime)}
           </span>
-          <div onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setProgress(((e.clientX - rect.left) / rect.width) * 100);
-          }} style={{
+          <div onClick={handleSeek} style={{
             flex: 1, height: "3px", background: "#2a2418",
             borderRadius: "2px", cursor: "pointer", position: "relative",
           }}>
             <div style={{
               height: "100%", borderRadius: "2px", width: `${progress}%`,
-              background: "linear-gradient(90deg, #c9a96e, #e8c080)", transition: "width 0.2s",
+              background: "linear-gradient(90deg, #c9a96e, #e8c080)", transition: "width 0.1s",
             }} />
           </div>
-          <span style={{ fontSize: "11px", color: "#555", minWidth: "36px" }}>{currentTrack.duration}</span>
+          <span style={{ fontSize: "11px", color: "#555", minWidth: "36px" }}>
+            {formatTime(duration)}
+          </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ flex: 1 }}>
@@ -275,15 +339,15 @@ export default function Home() {
             <p style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{currentTrack.creator}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-            <button style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏮</button>
-            <button onClick={() => setPlaying(!playing)} style={{
+            <button onClick={handlePrev} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏮</button>
+            <button onClick={() => activeTrack ? setPlaying(!playing) : handlePlay(tracks[0])} style={{
               width: "44px", height: "44px", borderRadius: "50%",
               background: "linear-gradient(135deg, #c9a96e, #a07840)",
               border: "none", cursor: "pointer", fontSize: "18px",
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#0d0b08", boxShadow: "0 0 20px rgba(201,169,110,0.3)",
             }}>{playing ? "⏸" : "▶"}</button>
-            <button style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏭</button>
+            <button onClick={handleNext} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏭</button>
           </div>
           <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "14px", color: "#666" }}>♪</span>
