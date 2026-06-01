@@ -23,7 +23,7 @@ const categories = ["All", "Romance", "Slow Burn", "Intense", "Narrative", "ASMR
 
 export default function Home() {
   const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [user, setUser] = useState(undefined); // undefined = loading, null = no user
+  const [user, setUser] = useState(undefined);
   const [activeTrack, setActiveTrack] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState({});
@@ -74,7 +74,7 @@ export default function Home() {
 
   const currentTrack = activeTrack || tracks[2];
 
-  if (user === undefined) return null; // loading session
+  if (user === undefined) return null;
 
   return (
     <>
@@ -101,7 +101,6 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Top Navigation */}
       <div style={{
         display: "flex", alignItems: "center",
         justifyContent: "space-between",
@@ -142,10 +141,7 @@ export default function Home() {
         }}>PREMIUM</button>
       </div>
 
-      {/* Main Content */}
       <div style={{ flex: 1, overflow: "auto", padding: "28px 28px 120px" }}>
-
-        {/* Hero */}
         <div style={{ marginBottom: "36px" }}>
           <p style={{ fontSize: "11px", letterSpacing: "0.2em", color: "#888", marginBottom: "6px", textTransform: "uppercase" }}>Good evening</p>
           <h1 style={{ fontSize: "28px", fontWeight: "normal", color: "#e8dcc8" }}>
@@ -153,7 +149,6 @@ export default function Home() {
           </h1>
         </div>
 
-        {/* Featured Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "40px" }}>
           {featured.map(f => (
             <div key={f.id} className="card" style={{
@@ -168,7 +163,6 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Category Pills */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" }}>
           {categories.map(cat => (
             <button key={cat} className="cat-pill" onClick={() => setActiveCategory(cat)} style={{
@@ -182,13 +176,11 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Track List Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px" }}>
           <h2 style={{ fontSize: "15px", fontWeight: "normal", letterSpacing: "0.08em", color: "#c9a96e" }}>✦ Featured Stories</h2>
           <span style={{ fontSize: "11px", color: "#555", letterSpacing: "0.1em", cursor: "pointer" }}>SEE ALL →</span>
         </div>
 
-        {/* Column Headers */}
         <div style={{
           display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px",
           padding: "8px 14px", fontSize: "10px", color: "#555",
@@ -197,7 +189,6 @@ export default function Home() {
           <span>#</span><span>TITLE</span><span>CREATOR</span><span>CATEGORY</span><span>DURATION</span><span></span>
         </div>
 
-        {/* Tracks */}
         {filteredTracks.map((track, i) => {
           const isActive = activeTrack?.id === track.id;
           const isPlaying = isActive && playing;
@@ -254,7 +245,6 @@ export default function Home() {
         })}
       </div>
 
-      {/* Player Bar */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
         background: "#100e0a", borderTop: "1px solid #2a2418",
@@ -290,4 +280,20 @@ export default function Home() {
               width: "44px", height: "44px", borderRadius: "50%",
               background: "linear-gradient(135deg, #c9a96e, #a07840)",
               border: "none", cursor: "pointer", fontSize: "18px",
-              disp
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#0d0b08", boxShadow: "0 0 20px rgba(201,169,110,0.3)",
+            }}>{playing ? "⏸" : "▶"}</button>
+            <button style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏭</button>
+          </div>
+          <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "14px", color: "#666" }}>♪</span>
+            <div style={{ width: "80px", height: "3px", background: "#2a2418", borderRadius: "2px" }}>
+              <div style={{ width: "70%", height: "100%", background: "#c9a96e", borderRadius: "2px" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </>
+  );
+}
