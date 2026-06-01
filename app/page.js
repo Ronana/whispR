@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import AgeGate from "./components/AgeGate";
 
 const tracks = [
   { id: 1, title: "Midnight Confession", creator: "VelvetVoice", duration: "18:42", category: "Romance", plays: "142K", isNew: false, isPremium: false },
@@ -19,12 +20,15 @@ const featured = [
 const categories = ["All", "Romance", "Slow Burn", "Intense", "Narrative", "ASMR", "Couples"];
 
 export default function Home() {
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [activeTrack, setActiveTrack] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState({});
   const [activeCategory, setActiveCategory] = useState("All");
   const [progress, setProgress] = useState(34);
   const [activeNav, setActiveNav] = useState("home");
+
+  const handleAgeConfirm = useCallback(() => setAgeConfirmed(true), []);
 
   useEffect(() => {
     let interval;
@@ -53,6 +57,8 @@ export default function Home() {
   const currentTrack = activeTrack || tracks[2];
 
   return (
+    <>
+      {!ageConfirmed && <AgeGate onConfirm={handleAgeConfirm} />}
     <div style={{
       fontFamily: "Georgia, 'Times New Roman', serif",
       background: "#0d0b08",
@@ -277,5 +283,6 @@ export default function Home() {
         </div>
       </div>
     </div>
+    </>
   );
 }
