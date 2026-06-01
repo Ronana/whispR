@@ -5,15 +5,6 @@ import AuthGate from "./components/AuthGate";
 import UserPanel from "./components/UserPanel";
 import { createClient } from "../lib/supabase";
 
-const tracks = [
-  { id: 1, title: "Midnight Confession", creator: "VelvetVoice", duration: "18:42", category: "Romance", plays: "142K", isNew: false, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-  { id: 2, title: "The Long Weekend", creator: "SilkTones", duration: "32:15", category: "Slow Burn", plays: "98K", isNew: true, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-  { id: 3, title: "After Hours", creator: "DeepAmber", duration: "24:08", category: "Intense", plays: "211K", isNew: false, isPremium: true, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
-  { id: 4, title: "Strangers on a Train", creator: "NightReads", duration: "41:00", category: "Narrative", plays: "76K", isNew: false, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-  { id: 5, title: "Breathless", creator: "VelvetVoice", duration: "15:30", category: "Romance", plays: "183K", isNew: true, isPremium: true, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
-  { id: 6, title: "The Cabin", creator: "WarmHarbour", duration: "28:44", category: "Slow Burn", plays: "54K", isNew: false, isPremium: false, audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
-];
-
 const featured = [
   { id: 1, title: "Top Picks For You", subtitle: "Curated to your taste", color: "#c9a96e" },
   { id: 2, title: "New This Week", subtitle: "Fresh voices, fresh stories", color: "#8c6e9a" },
@@ -32,6 +23,7 @@ function formatTime(seconds) {
 export default function Home() {
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [user, setUser] = useState(undefined);
+  const [tracks, setTracks] = useState([]);
   const [activeTrack, setActiveTrack] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState({});
@@ -40,7 +32,7 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [history, setHistory] = useState([]); // track ids, most recent first
+  const [history, setHistory] = useState([]);
 
   const audioRef = useRef(null);
 
@@ -49,8 +41,13 @@ export default function Home() {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
   }, []);
-  const handleSignOut = useCallback(() => setUser(null), []);
+  const handleSignOut = useCallback(() => {
+    setUser(null);
+    setLiked({});
+    setHistory([]);
+  }, []);
 
+  // Auth listener
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
@@ -62,6 +59,38 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Load tracks from Supabase
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from("tracks").select("*").order("id").then(({ data, error }) => {
+      if (!error && data) setTracks(data);
+    });
+  }, []);
+
+  // Load user's likes and history when logged in
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+
+    supabase.from("likes").select("track_id").eq("user_id", user.id).then(({ data }) => {
+      if (data) {
+        const likedMap = {};
+        data.forEach(r => { likedMap[r.track_id] = true; });
+        setLiked(likedMap);
+      }
+    });
+
+    supabase.from("listening_history")
+      .select("track_id")
+      .eq("user_id", user.id)
+      .order("played_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data) setHistory(data.map(r => r.track_id));
+      });
+  }, [user]);
+
+  // Audio setup
   useEffect(() => {
     const audio = new Audio();
     audioRef.current = audio;
@@ -74,7 +103,7 @@ export default function Home() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !activeTrack) return;
-    audio.src = activeTrack.audioUrl;
+    audio.src = activeTrack.audio_url;
     audio.load();
     setCurrentTime(0);
     setDuration(0);
@@ -88,13 +117,20 @@ export default function Home() {
     else audio.pause();
   }, [playing]);
 
+  const recordHistory = useCallback(async (track) => {
+    if (!user) return;
+    const supabase = createClient();
+    await supabase.from("listening_history").insert({ user_id: user.id, track_id: track.id });
+    setHistory(h => [track.id, ...h.filter(id => id !== track.id)].slice(0, 20));
+  }, [user]);
+
   const handlePlay = (track) => {
     if (activeTrack?.id === track.id) {
       setPlaying(!playing);
     } else {
       setActiveTrack(track);
       setPlaying(true);
-      setHistory(h => [track.id, ...h.filter(id => id !== track.id)].slice(0, 20));
+      recordHistory(track);
     }
   };
 
@@ -108,28 +144,40 @@ export default function Home() {
   };
 
   const handlePrev = () => {
-    if (!activeTrack) return;
+    if (!tracks.length || !activeTrack) return;
     const idx = tracks.findIndex(t => t.id === activeTrack.id);
     const prev = tracks[(idx - 1 + tracks.length) % tracks.length];
     setActiveTrack(prev);
     setPlaying(true);
-    setHistory(h => [prev.id, ...h.filter(id => id !== prev.id)].slice(0, 20));
+    recordHistory(prev);
   };
 
   const handleNext = () => {
-    if (!activeTrack) return;
+    if (!tracks.length || !activeTrack) return;
     const idx = tracks.findIndex(t => t.id === activeTrack.id);
     const next = tracks[(idx + 1) % tracks.length];
     setActiveTrack(next);
     setPlaying(true);
-    setHistory(h => [next.id, ...h.filter(id => id !== next.id)].slice(0, 20));
+    recordHistory(next);
+  };
+
+  const handleLike = async (track) => {
+    const isLiked = liked[track.id];
+    setLiked(l => ({ ...l, [track.id]: !isLiked }));
+    if (!user) return;
+    const supabase = createClient();
+    if (isLiked) {
+      await supabase.from("likes").delete().eq("user_id", user.id).eq("track_id", track.id);
+    } else {
+      await supabase.from("likes").insert({ user_id: user.id, track_id: track.id });
+    }
   };
 
   const filteredTracks = activeCategory === "All"
     ? tracks
     : tracks.filter(t => t.category === activeCategory);
 
-  const currentTrack = activeTrack || tracks[2];
+  const currentTrack = activeTrack || tracks[2] || tracks[0];
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
   const initials = (user?.user_metadata?.full_name || user?.email || "?")
@@ -275,7 +323,11 @@ export default function Home() {
           <span>#</span><span>TITLE</span><span>CREATOR</span><span>CATEGORY</span><span>DURATION</span><span></span>
         </div>
 
-        {filteredTracks.map((track) => {
+        {tracks.length === 0 ? (
+          <div style={{ padding: "40px 14px", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>
+            Loading stories...
+          </div>
+        ) : filteredTracks.map((track) => {
           const isActive = activeTrack?.id === track.id;
           const isPlaying = isActive && playing;
           return (
@@ -300,10 +352,10 @@ export default function Home() {
                   <span style={{ fontSize: "14px", color: isActive ? "#c9a96e" : "#e8dcc8", fontStyle: isActive ? "italic" : "normal" }}>
                     {track.title}
                   </span>
-                  {track.isNew && (
+                  {track.is_new && (
                     <span style={{ fontSize: "9px", padding: "1px 6px", background: "rgba(201,169,110,0.2)", borderRadius: "10px", color: "#c9a96e" }}>NEW</span>
                   )}
-                  {track.isPremium && <span style={{ color: "#c9a96e", fontSize: "11px" }}>🔒</span>}
+                  {track.is_premium && <span style={{ color: "#c9a96e", fontSize: "11px" }}>🔒</span>}
                 </div>
                 {isActive && (
                   <div style={{ display: "flex", alignItems: "center", gap: "2px", height: "16px", marginTop: "4px" }}>
@@ -322,7 +374,7 @@ export default function Home() {
               <span style={{ fontSize: "12px", color: "#888" }}>{track.creator}</span>
               <span style={{ fontSize: "10px", color: "#666" }}>{track.category}</span>
               <span style={{ fontSize: "12px", color: "#555" }}>{track.duration}</span>
-              <button onClick={() => setLiked(l => ({ ...l, [track.id]: !l[track.id] }))} style={{
+              <button onClick={() => handleLike(track)} style={{
                 background: "none", border: "none", cursor: "pointer", fontSize: "14px",
                 color: liked[track.id] ? "#c9a96e" : "#555",
               }}>♥</button>
@@ -356,12 +408,12 @@ export default function Home() {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ flex: 1 }}>
-            <p style={{ fontSize: "13px", color: "#e8dcc8", fontStyle: "italic" }}>{currentTrack.title}</p>
-            <p style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{currentTrack.creator}</p>
+            <p style={{ fontSize: "13px", color: "#e8dcc8", fontStyle: "italic" }}>{currentTrack?.title}</p>
+            <p style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{currentTrack?.creator}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
             <button onClick={handlePrev} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏮</button>
-            <button onClick={() => activeTrack ? setPlaying(!playing) : handlePlay(tracks[0])} style={{
+            <button onClick={() => activeTrack ? setPlaying(!playing) : tracks[0] && handlePlay(tracks[0])} style={{
               width: "44px", height: "44px", borderRadius: "50%",
               background: "linear-gradient(135deg, #c9a96e, #a07840)",
               border: "none", cursor: "pointer", fontSize: "18px",
