@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from "react";
 import AgeGate from "./components/AgeGate";
+import AuthGate from "./components/AuthGate";
+import { createClient } from "../lib/supabase";
 
 const tracks = [
   { id: 1, title: "Midnight Confession", creator: "VelvetVoice", duration: "18:42", category: "Romance", plays: "142K", isNew: false, isPremium: false },
@@ -21,6 +23,7 @@ const categories = ["All", "Romance", "Slow Burn", "Intense", "Narrative", "ASMR
 
 export default function Home() {
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [user, setUser] = useState(undefined); // undefined = loading, null = no user
   const [activeTrack, setActiveTrack] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState({});
@@ -29,6 +32,21 @@ export default function Home() {
   const [activeNav, setActiveNav] = useState("home");
 
   const handleAgeConfirm = useCallback(() => setAgeConfirmed(true), []);
+  const handleAuth = useCallback(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     let interval;
@@ -56,9 +74,12 @@ export default function Home() {
 
   const currentTrack = activeTrack || tracks[2];
 
+  if (user === undefined) return null; // loading session
+
   return (
     <>
       {!ageConfirmed && <AgeGate onConfirm={handleAgeConfirm} />}
+      {ageConfirmed && !user && <AuthGate onAuth={handleAuth} />}
     <div style={{
       fontFamily: "Georgia, 'Times New Roman', serif",
       background: "#0d0b08",
@@ -269,20 +290,4 @@ export default function Home() {
               width: "44px", height: "44px", borderRadius: "50%",
               background: "linear-gradient(135deg, #c9a96e, #a07840)",
               border: "none", cursor: "pointer", fontSize: "18px",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#0d0b08", boxShadow: "0 0 20px rgba(201,169,110,0.3)",
-            }}>{playing ? "⏸" : "▶"}</button>
-            <button style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏭</button>
-          </div>
-          <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "14px", color: "#666" }}>♪</span>
-            <div style={{ width: "80px", height: "3px", background: "#2a2418", borderRadius: "2px" }}>
-              <div style={{ width: "70%", height: "100%", background: "#c9a96e", borderRadius: "2px" }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    </>
-  );
-}
+              disp
