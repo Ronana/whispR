@@ -101,7 +101,13 @@ export default function Home() {
           .then(({ data: profiles }) => {
             if (profiles) {
               const map = {};
-              profiles.forEach(p => { map[p.display_name] = p; });
+              profiles.forEach(p => {
+                // Index by exact name AND normalised (lowercase, no spaces) for fuzzy lookup
+                if (p.display_name) {
+                  map[p.display_name] = p;
+                  map[p.display_name.toLowerCase().replace(/\s+/g, '')] = p;
+                }
+              });
               setCreatorProfiles(map);
             }
           });
@@ -491,7 +497,7 @@ export default function Home() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
                       {(() => {
-                        const cp = creatorProfiles[track.creator];
+                        const cp = creatorProfiles[track.creator] || creatorProfiles[(track.creator || '').toLowerCase().replace(/\s+/g, '')];
                         const initials2 = (track.creator || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
                         const nameEl = (
                           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -562,7 +568,7 @@ export default function Home() {
                   {!isActive && <span style={{ fontSize: "11px", color: "#555" }}>{Number(track.plays) >= 1000 ? `${(Number(track.plays)/1000).toFixed(1)}K` : track.plays} plays</span>}
                 </div>
                 {(() => {
-                  const cp = creatorProfiles[track.creator];
+                  const cp = creatorProfiles[track.creator] || creatorProfiles[(track.creator || '').toLowerCase().replace(/\s+/g, '')];
                   const initials2 = (track.creator || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
                   const inner = (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -687,16 +693,4 @@ export default function Home() {
             ["Terms", "/legal/terms"],
             ["Privacy", "/legal/privacy"],
             ["Cookies", "/legal/cookies"],
-            ["Guidelines", "/legal/guidelines"],
-            ["Legal", "/legal"],
-          ].map(([label, href]) => (
-            <a key={href} href={href} style={{ color: "#2e2820", pointerEvents: "all", transition: "color 0.2s" }}
-              onMouseEnter={e => e.currentTarget.style.color = "#555"}
-              onMouseLeave={e => e.currentTarget.style.color = "#2e2820"}
-            >{label}</a>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
+            ["Guidelines", "/legal/guidelines"
