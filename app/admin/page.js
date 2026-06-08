@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "../../lib/supabase";
-import { SkeletonStatCard, FadeIn } from "../../components/Skeleton";
+import { SkeletonStatCard, FadeIn } from "../components/Skeleton";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);

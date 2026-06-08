@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "../../../lib/supabase";
-import { SkeletonTableRow, FadeIn } from "../../../components/Skeleton";
+import { SkeletonTableRow, FadeIn } from "../../components/Skeleton";
 
 const ROLES = ["listener", "pending_creator", "creator", "admin", "suspended"];
 const ROLE_COLORS = {

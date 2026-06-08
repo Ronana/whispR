@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "../../../lib/supabase";
-import { Skeleton, FadeIn } from "../../../components/Skeleton";
+import { Skeleton, FadeIn } from "../../components/Skeleton";
 
 export default function ApplicationsPage() {
   const [apps, setApps] = useState([]);
