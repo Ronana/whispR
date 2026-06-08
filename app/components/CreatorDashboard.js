@@ -17,6 +17,11 @@ export default function CreatorDashboard({ user, profile }) {
   const [audioDuration, setAudioDuration] = useState(null);
 
   const fileRef = useRef(null);
+  const coverRef = useRef(null);
+  const [coverFile, setCoverFile] = useState(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverSuccess, setCoverSuccess] = useState(null);
+  const [coverPreview, setCoverPreview] = useState(profile?.cover_url || null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -44,6 +49,31 @@ export default function CreatorDashboard({ user, profile }) {
       setAudioDuration(`${m}:${String(s).padStart(2, "0")}`);
       URL.revokeObjectURL(url);
     });
+  };
+
+  const handleCoverSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { return; }
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleCoverUpload = async () => {
+    if (!coverFile) return;
+    setCoverUploading(true);
+    const supabase = createClient();
+    const ext = coverFile.name.split(".").pop();
+    const path = `covers/${user.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, coverFile, { upsert: true });
+    if (upErr) { setCoverUploading(false); return; }
+    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+    await supabase.from("profiles").update({ cover_url: urlData.publicUrl }).eq("user_id", user.id);
+    setCoverPreview(urlData.publicUrl);
+    setCoverSuccess("Cover photo updated!");
+    setCoverFile(null);
+    setCoverUploading(false);
+    if (coverRef.current) coverRef.current.value = "";
   };
 
   const handleUpload = async () => {
@@ -89,6 +119,53 @@ export default function CreatorDashboard({ user, profile }) {
 
   return (
     <div style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+      {/* Cover Photo */}
+      <div style={{ marginBottom: "20px" }}>
+        <p style={{ fontSize: "10px", color: "#c9a96e", letterSpacing: "0.12em", marginBottom: "10px" }}>COVER PHOTO</p>
+        <div
+          onClick={() => coverRef.current?.click()}
+          style={{
+            width: "100%", height: "120px", borderRadius: "10px",
+            background: coverPreview ? "none" : "rgba(201,169,110,0.04)",
+            border: coverPreview ? "none" : "2px dashed #2a2418",
+            overflow: "hidden", cursor: "pointer", position: "relative",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s",
+          }}
+        >
+          {coverPreview
+            ? <img src={coverPreview} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="cover" />
+            : <div style={{ textAlign: "center" }}>
+                <p style={{ fontSize: "22px" }}>🖼️</p>
+                <p style={{ fontSize: "11px", color: "#666", marginTop: "6px" }}>Click to upload cover photo</p>
+              </div>
+          }
+          {coverPreview && (
+            <div style={{
+              position: "absolute", inset: 0, background: "rgba(0,0,0,0)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.2s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.5)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0)"}
+            >
+              <p style={{ fontSize: "11px", color: "#fff", opacity: 0, transition: "opacity 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+              >Change cover</p>
+            </div>
+          )}
+        </div>
+        <input ref={coverRef} type="file" accept="image/*" onChange={handleCoverSelect} style={{ display: "none" }} />
+        {coverFile && (
+          <button onClick={handleCoverUpload} disabled={coverUploading} style={{
+            marginTop: "8px", padding: "7px 14px", borderRadius: "7px",
+            background: "linear-gradient(135deg, #c9a96e, #a07840)", border: "none",
+            color: "#0d0b08", fontSize: "11px", fontWeight: "bold", cursor: "pointer", fontFamily: "inherit",
+          }}>{coverUploading ? "Uploading…" : "Save Cover Photo"}</button>
+        )}
+        {coverSuccess && <p style={{ fontSize: "11px", color: "#8c6", marginTop: "6px" }}>✓ {coverSuccess}</p>}
+      </div>
+
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <div>

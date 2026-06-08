@@ -14,7 +14,7 @@ async function getCreatorData(username) {
     .from("tracks")
     .select("*")
     .eq("creator", profile.display_name)
-    .order("id", { ascending: false });
+    .order("plays", { ascending: false });
 
   return { profile, tracks: tracks || [] };
 }
@@ -42,120 +42,185 @@ export default async function CreatorPage({ params }) {
   const initials = (profile.display_name || username)
     .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
   const totalPlays = tracks.reduce((sum, t) => sum + (Number(t.plays) || 0), 0);
+  const monthlyListeners = totalPlays;
+
+  // Dominant colour from cover — fallback gradient
+  const hasCover = !!profile.cover_url;
 
   return (
     <div style={{
-      fontFamily: "Georgia, 'Times New Roman', serif",
+      fontFamily: "'Inter', system-ui, sans-serif",
       background: "#0d0b08", color: "#e8dcc8",
       minHeight: "100vh",
     }}>
-      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; } .track-row:hover { background: rgba(201,169,110,0.06) !important; }`}</style>
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        a { text-decoration: none; }
+        .track-row { transition: background 0.15s ease; cursor: pointer; }
+        .track-row:hover { background: rgba(255,255,255,0.06) !important; }
+        .track-row:hover .track-num { display: none !important; }
+        .track-row:hover .track-play { display: flex !important; }
+        .follow-btn { transition: all 0.2s ease; }
+        .follow-btn:hover { transform: scale(1.04); border-color: #fff !important; color: #fff !important; }
+        @keyframes whispr-fadein { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
 
-      {/* Nav */}
+      {/* ── Nav ── */}
       <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
+        padding: "14px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "18px 28px", borderBottom: "1px solid #1e1a14",
-        position: "sticky", top: 0, background: "#0d0b08", zIndex: 10,
+        background: "linear-gradient(180deg, rgba(13,11,8,0.9) 0%, transparent 100%)",
       }}>
-        <a href="/" style={{
-          display: "flex", alignItems: "center", gap: "10px", textDecoration: "none",
-        }}>
-          <div style={{ width: "32px", height: "32px", background: "linear-gradient(135deg, #c9a96e, #8c6030)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>〜</div>
-          <span style={{ fontSize: "20px", color: "#e8dcc8" }}>Whisp<span style={{ color: "#c9a96e", fontWeight: "bold" }}>R</span></span>
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ width: "30px", height: "30px", background: "linear-gradient(135deg, #c9a96e, #8c6030)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px" }}>〜</div>
+          <span style={{ fontSize: "18px", color: "#e8dcc8" }}>Whisp<span style={{ color: "#c9a96e", fontWeight: "bold" }}>R</span></span>
         </a>
-        <a href="/" style={{ fontSize: "11px", color: "#666", letterSpacing: "0.12em", textDecoration: "none" }}>← BACK</a>
+        <a href="/" style={{ fontSize: "11px", color: "#888", letterSpacing: "0.12em" }}>← BACK</a>
       </div>
 
-      {/* Hero */}
+      {/* ── Hero Banner ── */}
       <div style={{
-        background: "linear-gradient(180deg, #1a1510 0%, #0d0b08 100%)",
-        borderBottom: "1px solid #1e1a14",
-        padding: "48px 28px 36px",
+        position: "relative",
+        height: "clamp(280px, 40vw, 440px)",
+        overflow: "hidden",
+        background: hasCover ? "transparent" : "linear-gradient(135deg, #2a1f0e 0%, #1a1208 50%, #0d0b08 100%)",
       }}>
-        <div style={{ maxWidth: "700px", margin: "0 auto", display: "flex", alignItems: "flex-start", gap: "24px" }}>
-          {/* Avatar */}
-          <div style={{
-            width: "96px", height: "96px", borderRadius: "50%", flexShrink: 0,
-            background: profile.avatar_url ? "none" : "linear-gradient(135deg, #c9a96e, #8c6030)",
-            overflow: "hidden",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "28px", fontWeight: "bold", color: "#0a0806",
-            boxShadow: "0 0 24px rgba(201,169,110,0.25)",
-            border: "2px solid #c9a96e44",
+        {hasCover && (
+          <img
+            src={profile.cover_url}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
+          />
+        )}
+        {/* Gradient overlay */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "linear-gradient(180deg, rgba(13,11,8,0.1) 0%, rgba(13,11,8,0.3) 50%, rgba(13,11,8,0.95) 100%)",
+        }} />
+
+        {/* Creator name overlay */}
+        <div style={{
+          position: "absolute", bottom: "28px", left: "32px", right: "32px",
+          animation: "whispr-fadein 0.6s ease",
+        }}>
+          {profile.verified && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+              <div style={{
+                width: "20px", height: "20px", borderRadius: "50%",
+                background: "linear-gradient(135deg, #c9a96e, #8c6030)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "11px",
+              }}>✓</div>
+              <span style={{ fontSize: "12px", color: "#e8dcc8", fontWeight: "500" }}>Verified by WhispR</span>
+            </div>
+          )}
+          <h1 style={{
+            fontSize: "clamp(36px, 7vw, 80px)",
+            fontWeight: "900", color: "#fff",
+            letterSpacing: "-0.02em", lineHeight: 1,
+            textShadow: "0 2px 20px rgba(0,0,0,0.5)",
+            marginBottom: "16px",
           }}>
-            {profile.avatar_url
-              ? <img src={profile.avatar_url} alt={profile.display_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : initials
-            }
-          </div>
-
-          {/* Info */}
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-              <h1 style={{ fontSize: "26px", fontWeight: "normal", color: "#e8dcc8" }}>
-                {profile.display_name || username}
-              </h1>
-              <span style={{
-                fontSize: "9px", padding: "3px 9px",
-                background: "rgba(201,169,110,0.15)", border: "1px solid #c9a96e44",
-                borderRadius: "10px", color: "#c9a96e", letterSpacing: "0.1em",
-              }}>CREATOR</span>
-            </div>
-            <p style={{ fontSize: "12px", color: "#666", marginBottom: "14px" }}>@{profile.username || username}</p>
-            {profile.bio && (
-              <p style={{ fontSize: "14px", color: "#999", lineHeight: "1.7", maxWidth: "500px", fontStyle: "italic" }}>
-                {profile.bio}
-              </p>
-            )}
-
-            {/* Stats */}
-            <div style={{ display: "flex", gap: "28px", marginTop: "20px" }}>
-              {[
-                { label: "Tracks", value: tracks.length },
-                { label: "Total plays", value: totalPlays >= 1000 ? `${(totalPlays / 1000).toFixed(1)}K` : totalPlays },
-              ].map(stat => (
-                <div key={stat.label}>
-                  <p style={{ fontSize: "18px", color: "#c9a96e" }}>{stat.value}</p>
-                  <p style={{ fontSize: "10px", color: "#555", letterSpacing: "0.1em" }}>{stat.label.toUpperCase()}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+            {profile.display_name || username}
+          </h1>
+          <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", fontWeight: "400" }}>
+            {monthlyListeners >= 1000
+              ? `${(monthlyListeners / 1000).toFixed(1)}K`
+              : monthlyListeners.toLocaleString()} monthly listeners
+          </p>
         </div>
       </div>
 
-      {/* Tracks */}
-      <div style={{ maxWidth: "700px", margin: "0 auto", padding: "32px 28px" }}>
-        <h2 style={{ fontSize: "14px", fontWeight: "normal", color: "#c9a96e", letterSpacing: "0.1em", marginBottom: "16px" }}>
-          ✦ All Stories
-        </h2>
+      {/* ── Actions Bar ── */}
+      <div style={{
+        padding: "24px 32px",
+        display: "flex", alignItems: "center", gap: "20px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        {/* Avatar (small, beside actions) */}
+        <div style={{
+          width: "56px", height: "56px", borderRadius: "50%", flexShrink: 0,
+          background: profile.avatar_url ? "none" : "linear-gradient(135deg, #c9a96e, #8c6030)",
+          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "18px", fontWeight: "700", color: "#0a0806",
+          boxShadow: "0 0 0 2px rgba(201,169,110,0.3)",
+        }}>
+          {profile.avatar_url
+            ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : initials
+          }
+        </div>
+
+        <button className="follow-btn" style={{
+          padding: "8px 24px", borderRadius: "999px",
+          background: "transparent", border: "1px solid rgba(255,255,255,0.3)",
+          color: "rgba(255,255,255,0.7)", fontSize: "13px", fontWeight: "600",
+          cursor: "pointer", letterSpacing: "0.05em",
+        }}>Following</button>
+
+        <div style={{ marginLeft: "auto", textAlign: "right" }}>
+          <p style={{ fontSize: "12px", color: "#555" }}>{tracks.length} {tracks.length === 1 ? "story" : "stories"}</p>
+        </div>
+      </div>
+
+      {/* ── Bio ── */}
+      {profile.bio && (
+        <div style={{ padding: "20px 32px 0", maxWidth: "600px" }}>
+          <p style={{ fontSize: "14px", color: "#888", lineHeight: "1.7", fontStyle: "italic" }}>{profile.bio}</p>
+        </div>
+      )}
+
+      {/* ── Popular Tracks ── */}
+      <div style={{ padding: "28px 32px 80px" }}>
+        <h2 style={{ fontSize: "22px", fontWeight: "700", color: "#fff", marginBottom: "16px", letterSpacing: "-0.01em" }}>Popular</h2>
 
         {tracks.length === 0 ? (
-          <p style={{ color: "#444", fontSize: "13px", fontStyle: "italic", textAlign: "center", padding: "40px 0" }}>
-            No tracks published yet.
-          </p>
-        ) : tracks.map((track) => (
+          <p style={{ color: "#444", fontSize: "13px", fontStyle: "italic" }}>No stories published yet.</p>
+        ) : tracks.map((track, i) => (
           <div key={track.id} className="track-row" style={{
-            display: "flex", alignItems: "center", gap: "16px",
-            padding: "14px 12px", borderRadius: "8px",
-            borderBottom: "1px solid #1a1710", transition: "background 0.2s",
+            display: "grid",
+            gridTemplateColumns: "40px 1fr 1fr 80px",
+            alignItems: "center", gap: "12px",
+            padding: "10px 14px", borderRadius: "6px",
+            background: "transparent",
           }}>
-            <div style={{
-              width: "36px", height: "36px", borderRadius: "50%", flexShrink: 0,
-              background: "rgba(201,169,110,0.1)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "14px", color: "#c9a96e",
-            }}>♪</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "14px", color: "#e8dcc8" }}>{track.title}</span>
-                {track.is_new && <span style={{ fontSize: "9px", padding: "1px 6px", background: "rgba(201,169,110,0.2)", borderRadius: "10px", color: "#c9a96e" }}>NEW</span>}
+            {/* Number / play icon */}
+            <div style={{ textAlign: "center", position: "relative" }}>
+              <span className="track-num" style={{ fontSize: "15px", color: i < 3 ? "#c9a96e" : "#666" }}>{i + 1}</span>
+              <span className="track-play" style={{ display: "none", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "16px" }}>▶</span>
+            </div>
+
+            {/* Title + category */}
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+              <div style={{
+                width: "44px", height: "44px", borderRadius: "6px", flexShrink: 0,
+                background: "rgba(201,169,110,0.12)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "18px", color: "#c9a96e",
+              }}>♪</div>
+              <div style={{ minWidth: 0 }}>
+                <p style={{
+                  fontSize: "15px", color: "#fff", fontWeight: "500",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {track.title}
+                  {track.is_new && <span style={{ marginLeft: "8px", fontSize: "9px", padding: "2px 6px", background: "rgba(201,169,110,0.2)", borderRadius: "8px", color: "#c9a96e", verticalAlign: "middle" }}>NEW</span>}
+                  {track.is_premium && <span style={{ marginLeft: "6px", fontSize: "9px", padding: "2px 6px", background: "rgba(201,169,110,0.1)", border: "1px solid #c9a96e44", borderRadius: "8px", color: "#c9a96e88", verticalAlign: "middle" }}>✦ PREMIUM</span>}
+                </p>
+                <p style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>{track.category}</p>
               </div>
-              <span style={{ fontSize: "11px", color: "#666" }}>{track.category} · {track.duration}</span>
             </div>
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
-              <p style={{ fontSize: "12px", color: "#888" }}>{(track.plays || 0).toLocaleString()} plays</p>
-            </div>
+
+            {/* Duration */}
+            <p style={{ fontSize: "13px", color: "#666" }}>{track.duration}</p>
+
+            {/* Plays */}
+            <p style={{ fontSize: "13px", color: "#888", textAlign: "right" }}>
+              {Number(track.plays) >= 1000
+                ? `${(Number(track.plays) / 1000).toFixed(1)}K`
+                : track.plays}
+            </p>
           </div>
         ))}
       </div>
