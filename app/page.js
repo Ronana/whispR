@@ -6,6 +6,7 @@ import UserPanel from "./components/UserPanel";
 import PremiumModal from "./components/PremiumModal";
 import { createClient } from "../lib/supabase";
 import { getT } from "../lib/translations";
+import { getPlan } from "../lib/payments";
 
 const featured = [
   { id: 1, color: "#c9a96e" },
@@ -51,6 +52,7 @@ export default function Home() {
   }, []);
 
   const t = getT(language);
+  const plan = getPlan(language);
 
   useEffect(() => { setActiveCategory(null); }, [language]);
 
@@ -218,12 +220,13 @@ export default function Home() {
           onClose={() => setPanelOpen(false)}
           onSignOut={handleSignOut}
           onLanguageChange={handleLanguageChange}
+          plan={plan}
           onUpgrade={() => { setPanelOpen(false); setShowPremiumModal(true); }}
           t={t}
         />
       )}
       {showPremiumModal && (
-        <PremiumModal
+        <PremiumModal language={language} plan={plan}
           user={user}
           onClose={() => setShowPremiumModal(false)}
         />

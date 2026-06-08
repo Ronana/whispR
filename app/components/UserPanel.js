@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from "react";
 import { createClient } from "../../lib/supabase";
-import { openBillingPortal, PLAN } from "../../lib/payments";
+import { openBillingPortal } from "../../lib/payments";
 
 const DEFAULT_SETTINGS = {
   audioQuality: "High",
@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS = {
   language: "en",
 };
 
-export default function UserPanel({ user, liked, tracks, history, isPremium, onClose, onSignOut, onLanguageChange, onUpgrade, t }) {
+export default function UserPanel({ user, liked, tracks, history, isPremium, plan, onClose, onSignOut, onLanguageChange, onUpgrade, t }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [profileTab, setProfileTab] = useState("liked");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -123,7 +123,7 @@ export default function UserPanel({ user, liked, tracks, history, isPremium, onC
               color: "#c9a96e", fontSize: "11px", letterSpacing: "0.1em",
               cursor: "pointer", fontFamily: "inherit", marginBottom: "16px",
             }}>
-              ♛ Upgrade to Premium — {PLAN.price}/{PLAN.period}
+              ♛ Upgrade to Premium — {plan.price}/{plan.period}
             </button>
           ) : (
             <button onClick={handleManageBilling} disabled={portalLoading} style={{

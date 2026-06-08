@@ -1,8 +1,8 @@
 'use client';
 import { useState } from "react";
-import { PLAN, initiateCheckout } from "../../lib/payments";
+import { initiateCheckout } from "../../lib/payments";
 
-export default function PremiumModal({ user, onClose }) {
+export default function PremiumModal({ user, language = 'en', plan, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -11,7 +11,7 @@ export default function PremiumModal({ user, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      const { url } = await initiateCheckout({ userId: user.id, userEmail: user.email });
+      const { url } = await initiateCheckout({ userId: user.id, userEmail: user.email, lang: language });
       window.location.href = url;
     } catch (e) {
       setError(e.message || "Something went wrong. Please try again.");
@@ -21,18 +21,13 @@ export default function PremiumModal({ user, onClose }) {
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.75)",
-          backdropFilter: "blur(4px)",
-          zIndex: 400,
-        }}
-      />
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0,
+        background: "rgba(0,0,0,0.75)",
+        backdropFilter: "blur(4px)",
+        zIndex: 400,
+      }} />
 
-      {/* Modal */}
       <div style={{
         position: "fixed",
         top: "50%", left: "50%",
@@ -45,7 +40,7 @@ export default function PremiumModal({ user, onClose }) {
         overflow: "hidden",
         fontFamily: "Georgia, 'Times New Roman', serif",
       }}>
-        {/* Gold gradient header */}
+        {/* Header */}
         <div style={{
           background: "linear-gradient(135deg, #c9a96e22, #8c603010)",
           borderBottom: "1px solid #2a2418",
@@ -59,7 +54,6 @@ export default function PremiumModal({ user, onClose }) {
             cursor: "pointer", fontSize: "18px",
           }}>✕</button>
 
-          {/* Crown icon */}
           <div style={{
             width: "52px", height: "52px", margin: "0 auto 14px",
             background: "linear-gradient(135deg, #c9a96e, #8c6030)",
@@ -70,27 +64,30 @@ export default function PremiumModal({ user, onClose }) {
           }}>♛</div>
 
           <h2 style={{ fontSize: "22px", fontWeight: "normal", color: "#e8dcc8", marginBottom: "6px" }}>
-            {PLAN.name}
+            {plan.name}
           </h2>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "4px" }}>
-            <span style={{ fontSize: "32px", color: "#c9a96e" }}>{PLAN.price}</span>
-            <span style={{ fontSize: "13px", color: "#888" }}>/ {PLAN.period}</span>
+            <span style={{ fontSize: "32px", color: "#c9a96e" }}>{plan.price}</span>
+            <span style={{ fontSize: "13px", color: "#888" }}>/ {plan.period}</span>
           </div>
-          <p style={{ fontSize: "11px", color: "#555", marginTop: "6px", letterSpacing: "0.1em" }}>
+          <p style={{ fontSize: "11px", color: "#666", marginTop: "4px", letterSpacing: "0.08em" }}>
+            {plan.currency}
+          </p>
+          <p style={{ fontSize: "11px", color: "#555", marginTop: "4px", letterSpacing: "0.1em" }}>
             Cancel any time
           </p>
         </div>
 
-        {/* Perks list */}
+        {/* Perks */}
         <div style={{ padding: "24px 28px" }}>
           <p style={{ fontSize: "10px", color: "#666", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "14px" }}>
             Everything included
           </p>
-          {PLAN.perks.map((perk, i) => (
+          {plan.perks.map((perk, i) => (
             <div key={i} style={{
               display: "flex", alignItems: "center", gap: "12px",
               padding: "10px 0",
-              borderBottom: i < PLAN.perks.length - 1 ? "1px solid #1a1710" : "none",
+              borderBottom: i < plan.perks.length - 1 ? "1px solid #1a1710" : "none",
             }}>
               <span style={{ fontSize: "18px", width: "24px", textAlign: "center" }}>{perk.icon}</span>
               <span style={{ fontSize: "13px", color: "#e8dcc8" }}>{perk.label}</span>
@@ -110,27 +107,22 @@ export default function PremiumModal({ user, onClose }) {
               {error}
             </div>
           )}
-
           <button
             onClick={handleUpgrade}
             disabled={loading}
             style={{
               width: "100%", padding: "14px",
-              background: loading
-                ? "#2a2418"
-                : "linear-gradient(135deg, #c9a96e, #a07840)",
+              background: loading ? "#2a2418" : "linear-gradient(135deg, #c9a96e, #a07840)",
               border: "none", borderRadius: "10px",
               color: loading ? "#555" : "#0d0b08",
               fontSize: "13px", fontWeight: "bold",
               letterSpacing: "0.12em", textTransform: "uppercase",
               cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "inherit",
-              transition: "all 0.2s",
+              fontFamily: "inherit", transition: "all 0.2s",
             }}
           >
             {loading ? "Redirecting..." : "Upgrade to Premium"}
           </button>
-
           <p style={{
             fontSize: "10px", color: "#444", textAlign: "center",
             marginTop: "12px", lineHeight: "1.5",
