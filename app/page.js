@@ -376,11 +376,10 @@ export default function Home() {
               Array.from({ length: isMobile ? 1 : 3 }).map((_, i) => (
                 <SkeletonFeaturedCard key={i} />
               ))
-            ) : featured.map((f, i) => (
-              {(() => {
-                const icons = ["〜", "✦", "♪"];
-                const descs = ["New this week", "Editor's picks", "Top played"];
-                return (
+            ) : featured.map((f, i) => {
+              const icons = ["〜", "✦", "♪"];
+              const descs = ["New this week", "Editor's picks", "Top played"];
+              return (
                   <div key={f.id} className="card" style={{
                     background: `linear-gradient(135deg, ${f.color}18 0%, ${f.color}06 100%)`,
                     border: `1px solid ${f.color}25`,
@@ -413,9 +412,8 @@ export default function Home() {
                       background: `${f.color}08`,
                     }} />}
                   </div>
-                );
-              })()}
-            ))}
+              );
+            })}
           </div>
 
           {/* Category pills — horizontal scroll on mobile */}
