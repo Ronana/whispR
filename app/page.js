@@ -29,6 +29,7 @@ export default function Home() {
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState({});
   const [activeCategory, setActiveCategory] = useState(null);
+  const [search, setSearch] = useState('');
   const [activeNav, setActiveNav] = useState("home");
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -55,6 +56,8 @@ export default function Home() {
   const plan = getPlan(language);
 
   useEffect(() => { setActiveCategory(null); }, [language]);
+
+  const clearSearch = () => setSearch('');
 
   const handleAgeConfirm = useCallback(() => setAgeConfirmed(true), []);
   const handleAuth = useCallback(() => {
@@ -193,10 +196,12 @@ export default function Home() {
     a.click();
   };
 
+  const query = search.trim().toLowerCase();
   const activeCat = activeCategory ?? t.categories[0];
-  const filteredTracks = activeCat === t.categories[0]
+  const filteredTracks = (activeCat === t.categories[0]
     ? tracks
-    : tracks.filter(tr => tr.category === activeCat);
+    : tracks.filter(tr => tr.category === activeCat))
+    .filter(tr => !query || tr.title.toLowerCase().includes(query) || tr.creator.toLowerCase().includes(query) || tr.category.toLowerCase().includes(query));
 
   const currentTrack = activeTrack || tracks[2] || tracks[0];
   const progress = duration ? (currentTime / duration) * 100 : 0;
@@ -245,6 +250,8 @@ export default function Home() {
           .cat-pill:hover { border-color: #c9a96e !important; color: #c9a96e !important; }
           .card:hover { transform: translateY(-3px); }
           .avatar-btn:hover { box-shadow: 0 0 16px rgba(201,169,110,0.4) !important; }
+          .search-input:focus { border-color: #c9a96e88 !important; outline: none; }
+          .search-clear:hover { color: #c9a96e !important; }
           .premium-btn:hover { background: linear-gradient(135deg, #e8c080, #c9a96e) !important; }
           .dl-btn:hover { color: #c9a96e !important; }
           @keyframes wave { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }
@@ -314,6 +321,47 @@ export default function Home() {
           </div>
         </div>
 
+
+        {/* Search bar */}
+        <div style={{
+          padding: "12px 28px",
+          borderBottom: "1px solid #1e1a14",
+          background: "#0d0b08",
+        }}>
+          <div style={{ position: "relative", maxWidth: "480px" }}>
+            <span style={{
+              position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)",
+              fontSize: "14px", color: "#444", pointerEvents: "none",
+            }}>🔍</span>
+            <input
+              className="search-input"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search titles, creators, categories..."
+              style={{
+                width: "100%", background: "#1a1710",
+                border: "1px solid #2a2418", borderRadius: "20px",
+                padding: "9px 36px 9px 36px",
+                color: "#e8dcc8", fontSize: "13px",
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                transition: "border-color 0.2s",
+              }}
+            />
+            {search && (
+              <button
+                className="search-clear"
+                onClick={clearSearch}
+                style={{
+                  position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", color: "#555",
+                  cursor: "pointer", fontSize: "16px", lineHeight: 1,
+                  transition: "color 0.2s",
+                }}
+              >✕</button>
+            )}
+          </div>
+        </div>
+
         {/* Main */}
         <div style={{ flex: 1, overflow: "auto", padding: "28px 28px 120px" }}>
           <div style={{ marginBottom: "36px" }}>
@@ -360,6 +408,10 @@ export default function Home() {
 
           {tracks.length === 0 ? (
             <div style={{ padding: "40px 14px", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>{t.loading}</div>
+          ) : filteredTracks.length === 0 ? (
+            <div style={{ padding: "40px 14px", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>
+              No results for &ldquo;{search}&rdquo; — <button onClick={clearSearch} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "inherit", fontSize: "13px", fontStyle: "italic" }}>clear search</button>
+            </div>
           ) : filteredTracks.map((track) => {
             const isActive = activeTrack?.id === track.id;
             const isPlaying = isActive && playing;
