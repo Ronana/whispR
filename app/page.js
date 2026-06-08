@@ -216,13 +216,11 @@ export default function Home() {
   // Bottom padding: player (96px) + mobile bottom nav (56px) if mobile
   const mainPaddingBottom = isMobile ? "168px" : "120px";
 
-  if (user === undefined) return null;
-
   return (
     <>
       {!ageConfirmed && <AgeGate onConfirm={handleAgeConfirm} />}
-      {ageConfirmed && !user && <AuthGate onAuth={handleAuth} />}
-      {panelOpen && user && (
+      {ageConfirmed && user === null && <AuthGate onAuth={handleAuth} />}
+      {panelOpen && user && user !== undefined && (
         <UserPanel
           user={user} liked={liked} tracks={tracks} history={history}
           isPremium={isPremium} plan={plan}
