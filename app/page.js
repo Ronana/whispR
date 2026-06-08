@@ -39,6 +39,7 @@ export default function Home() {
   const [language, setLanguage] = useState("en");
   const [isPremium, setIsPremium] = useState(false);
   const [tracksLoaded, setTracksLoaded] = useState(false);
+  const [creatorProfiles, setCreatorProfiles] = useState({});
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [search, setSearch] = useState("");
   const [isMobile, setIsMobile] = useState(false);
@@ -90,7 +91,20 @@ export default function Home() {
   useEffect(() => {
     const supabase = createClient();
     supabase.from("tracks").select("*").order("id").then(({ data, error }) => {
-      if (!error && data) setTracks(data);
+      if (!error && data) {
+        setTracks(data);
+        // Load creator profiles for avatars + links
+        supabase.from("profiles")
+          .select("display_name, username, avatar_url")
+          .eq("role", "creator")
+          .then(({ data: profiles }) => {
+            if (profiles) {
+              const map = {};
+              profiles.forEach(p => { map[p.display_name] = p; });
+              setCreatorProfiles(map);
+            }
+          });
+      }
     });
   }, []);
 
@@ -345,10 +359,11 @@ export default function Home() {
 
           {/* Hero */}
           <div style={{ marginBottom: isMobile ? "24px" : "36px" }}>
-            <p style={{ fontSize: "11px", letterSpacing: "0.2em", color: "#888", marginBottom: "6px", textTransform: "uppercase" }}>{t.greeting}</p>
-            <h1 style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: "normal", color: "#e8dcc8" }}>
-              {t.hero} <span style={{ color: "#c9a96e", fontStyle: "italic" }}>{t.heroCta}</span>
+            <p style={{ fontSize: "10px", letterSpacing: "0.25em", color: "#c9a96e88", marginBottom: "8px", textTransform: "uppercase", fontFamily: "system-ui, sans-serif" }}>{t.greeting}</p>
+            <h1 style={{ fontSize: isMobile ? "24px" : "32px", fontWeight: "300", color: "#e8dcc8", lineHeight: 1.2, letterSpacing: "-0.01em" }}>
+              {t.hero} <span style={{ color: "#c9a96e", fontStyle: "italic", fontWeight: "400" }}>{t.heroCta}</span>
             </h1>
+            {!isMobile && <div style={{ width: "40px", height: "1px", background: "linear-gradient(90deg, #c9a96e, transparent)", marginTop: "14px" }} />}
           </div>
 
           {/* Featured cards — 1 col mobile, 3 col desktop */}
@@ -362,20 +377,44 @@ export default function Home() {
                 <SkeletonFeaturedCard key={i} />
               ))
             ) : featured.map((f, i) => (
-              <div key={f.id} className="card" style={{
-                background: `linear-gradient(135deg, ${f.color}22, ${f.color}08)`,
-                border: `1px solid ${f.color}30`,
-                borderRadius: "12px", padding: isMobile ? "16px" : "20px",
-                cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                display: "flex", alignItems: isMobile ? "center" : "block", gap: "12px",
-                animation: "whispr-fadein 0.4s ease forwards",
-              }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 24px ${f.color}20`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-              >
-                <p style={{ fontSize: "14px", color: "#e8dcc8", marginBottom: isMobile ? "0" : "4px" }}>{t.featuredCards[i].title}</p>
-                {!isMobile && <p style={{ fontSize: "11px", color: "#888" }}>{t.featuredCards[i].subtitle}</p>}
-              </div>
+              {(() => {
+                const icons = ["〜", "✦", "♪"];
+                const descs = ["New this week", "Editor's picks", "Top played"];
+                return (
+                  <div key={f.id} className="card" style={{
+                    background: `linear-gradient(135deg, ${f.color}18 0%, ${f.color}06 100%)`,
+                    border: `1px solid ${f.color}25`,
+                    borderRadius: "14px", padding: isMobile ? "14px 16px" : "22px",
+                    cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    display: "flex", alignItems: isMobile ? "center" : "flex-start",
+                    flexDirection: isMobile ? "row" : "column",
+                    gap: isMobile ? "12px" : "14px",
+                    animation: "whispr-fadein 0.4s ease forwards",
+                    position: "relative", overflow: "hidden",
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 12px 32px ${f.color}18`; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+                  >
+                    <div style={{
+                      width: isMobile ? "40px" : "48px", height: isMobile ? "40px" : "48px",
+                      borderRadius: "10px", flexShrink: 0,
+                      background: `${f.color}20`, border: `1px solid ${f.color}30`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: isMobile ? "18px" : "22px", color: f.color,
+                    }}>{icons[i]}</div>
+                    <div>
+                      <p style={{ fontSize: isMobile ? "13px" : "15px", color: "#e8dcc8", fontWeight: "500", marginBottom: "3px" }}>{t.featuredCards[i].title}</p>
+                      {!isMobile && <p style={{ fontSize: "11px", color: "#666" }}>{descs[i]}</p>}
+                    </div>
+                    {/* Decorative bg circle */}
+                    {!isMobile && <div style={{
+                      position: "absolute", right: "-20px", bottom: "-20px",
+                      width: "80px", height: "80px", borderRadius: "50%",
+                      background: `${f.color}08`,
+                    }} />}
+                  </div>
+                );
+              })()}
             ))}
           </div>
 
@@ -401,15 +440,21 @@ export default function Home() {
           </div>
 
           {/* Track list header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "14px" }}>
-            <h2 style={{ fontSize: "14px", fontWeight: "normal", letterSpacing: "0.08em", color: "#c9a96e" }}>{t.featured.title}</h2>
-            <span style={{ fontSize: "11px", color: "#555", letterSpacing: "0.1em", cursor: "pointer" }}>{t.featured.seeAll}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ width: "3px", height: "18px", background: "linear-gradient(180deg, #c9a96e, #8c6030)", borderRadius: "2px" }} />
+              <h2 style={{ fontSize: "15px", fontWeight: "500", letterSpacing: "0.06em", color: "#e8dcc8", fontFamily: "system-ui, sans-serif" }}>{t.featured.title}</h2>
+            </div>
+            <span style={{ fontSize: "11px", color: "#555", letterSpacing: "0.1em", cursor: "pointer", transition: "color 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.color = "#c9a96e"}
+              onMouseLeave={e => e.currentTarget.style.color = "#555"}
+            >{t.featured.seeAll}</span>
           </div>
 
           {/* Column headers — hidden on mobile */}
           {!isMobile && (
-            <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px 32px", padding: "8px 14px", fontSize: "10px", color: "#555", letterSpacing: "0.12em", borderBottom: "1px solid #1a1710" }}>
-              <span>#</span><span>{t.cols.title}</span><span>{t.cols.creator}</span><span>{t.cols.category}</span><span>{t.cols.duration}</span><span></span><span></span>
+            <div style={{ display: "grid", gridTemplateColumns: "32px 44px 1fr 160px 80px 60px 40px 32px", padding: "8px 14px", fontSize: "10px", color: "#555", letterSpacing: "0.12em", borderBottom: "1px solid #1a1710" }}>
+              <span>#</span><span></span><span>{t.cols.title}</span><span>{t.cols.creator}</span><span>{t.cols.category}</span><span>{t.cols.duration}</span><span></span><span></span>
             </div>
           )}
 
@@ -447,7 +492,29 @@ export default function Home() {
                       <span style={{ fontSize: "14px", color: isActive ? "#c9a96e" : "#e8dcc8", fontStyle: isActive ? "italic" : "normal", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.title}</span>
                       {track.is_new && <span style={{ fontSize: "9px", padding: "1px 5px", background: "rgba(201,169,110,0.2)", borderRadius: "8px", color: "#c9a96e", flexShrink: 0 }}>NEW</span>}
                     </div>
-                    <p style={{ fontSize: "11px", color: "#666", marginTop: "2px" }}>{track.creator} · {track.duration}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                      {(() => {
+                        const cp = creatorProfiles[track.creator];
+                        const initials2 = (track.creator || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+                        const nameEl = (
+                          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                            <div style={{
+                              width: "16px", height: "16px", borderRadius: "50%", flexShrink: 0,
+                              background: cp?.avatar_url ? "none" : "rgba(201,169,110,0.2)",
+                              overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "7px", color: "#c9a96e",
+                            }}>
+                              {cp?.avatar_url ? <img src={cp.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials2}
+                            </div>
+                            <span style={{ fontSize: "11px", color: cp ? "#c9a96e" : "#666" }}>{track.creator}</span>
+                          </div>
+                        );
+                        return cp?.username
+                          ? <a href={`/creator/${cp.username}`} style={{ textDecoration: "none" }}>{nameEl}</a>
+                          : nameEl;
+                      })()}
+                      <span style={{ fontSize: "11px", color: "#555" }}>· {track.duration}</span>
+                    </div>
                     {isActive && isPlaying && (
                       <div style={{ display: "flex", alignItems: "center", gap: "2px", height: "12px", marginTop: "4px" }}>
                         {Array.from({ length: 12 }).map((_, j) => (
@@ -463,7 +530,7 @@ export default function Home() {
 
             return (
               <div key={track.id} className="track-row" style={{
-                display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px 32px",
+                display: "grid", gridTemplateColumns: "32px 44px 1fr 160px 80px 60px 40px 32px",
                 padding: "12px 14px", borderRadius: "8px", alignItems: "center",
                 background: isActive ? "rgba(201,169,110,0.08)" : "transparent", transition: "background 0.2s",
               }}>
@@ -474,6 +541,14 @@ export default function Home() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: isActive ? "#0d0b08" : "#c9a96e", fontSize: "8px", transition: "all 0.2s",
                 }}>{isPlaying ? "⏸" : "▶"}</button>
+                {/* Track art */}
+                <div style={{
+                  width: "38px", height: "38px", borderRadius: "6px", flexShrink: 0,
+                  background: isActive ? "rgba(201,169,110,0.2)" : "rgba(201,169,110,0.07)",
+                  border: isActive ? "1px solid #c9a96e44" : "1px solid #1e1a14",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "14px", color: isActive ? "#c9a96e" : "#333",
+                }}>♪</div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "14px", color: isActive ? "#c9a96e" : "#e8dcc8", fontStyle: isActive ? "italic" : "normal" }}>{track.title}</span>
@@ -487,9 +562,33 @@ export default function Home() {
                       ))}
                     </div>
                   )}
-                  {!isActive && <span style={{ fontSize: "11px", color: "#555" }}>{track.plays} plays</span>}
+                  {!isActive && <span style={{ fontSize: "11px", color: "#555" }}>{Number(track.plays) >= 1000 ? `${(Number(track.plays)/1000).toFixed(1)}K` : track.plays} plays</span>}
                 </div>
-                <span style={{ fontSize: "12px", color: "#888" }}>{track.creator}</span>
+                {(() => {
+                  const cp = creatorProfiles[track.creator];
+                  const initials2 = (track.creator || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+                  const inner = (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div style={{
+                        width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0,
+                        background: cp?.avatar_url ? "none" : "linear-gradient(135deg, #c9a96e44, #8c603044)",
+                        overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "9px", color: "#c9a96e",
+                      }}>
+                        {cp?.avatar_url
+                          ? <img src={cp.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : initials2}
+                      </div>
+                      <span style={{ fontSize: "12px", color: cp ? "#c9a96e" : "#888", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.creator}</span>
+                    </div>
+                  );
+                  return cp?.username
+                    ? <a href={`/creator/${cp.username}`} style={{ textDecoration: "none", transition: "opacity 0.2s" }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = "0.75"}
+                        onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                      >{inner}</a>
+                    : inner;
+                })()}
                 <span style={{ fontSize: "10px", color: "#666" }}>{track.category}</span>
                 <span style={{ fontSize: "12px", color: "#555" }}>{track.duration}</span>
                 <button onClick={() => handleLike(track)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: liked[track.id] ? "#c9a96e" : "#555" }}>♥</button>
