@@ -41,7 +41,7 @@ export default async function CreatorPage({ params }) {
   const { profile, tracks } = data;
   const initials = (profile.display_name || username)
     .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-  const totalPlays = tracks.reduce((sum, t) => sum + (t.plays || 0), 0);
+  const totalPlays = tracks.reduce((sum, t) => sum + (Number(t.plays) || 0), 0);
 
   return (
     <div style={{
