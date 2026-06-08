@@ -5,6 +5,7 @@ import { openBillingPortal } from "../../lib/payments";
 import ProfileEditModal from "./ProfileEditModal";
 import CreatorApplicationModal from "./CreatorApplicationModal";
 import CreatorDashboard from "./CreatorDashboard";
+import { Skeleton, SkeletonAvatar } from "./Skeleton";
 
 const DEFAULT_SETTINGS = {
   audioQuality: "High",
@@ -353,7 +354,4 @@ function SettingSelect({ label, desc, value, options, onChange, premiumNote, onU
       <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", background: "#1a1710", border: "1px solid #2a2418", color: "#e8dcc8", borderRadius: "6px", padding: "8px 10px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
       </select>
-      {premiumNote && <button onClick={onUpgrade} style={{ marginTop: "6px", fontSize: "10px", color: "#c9a96e", background: "none", border: "none", cursor: "pointer", fontFamily: "Georgia, serif", padding: 0 }}>♛ {premiumNote}</button>}
-    </div>
-  );
-}
+      {premiumNote && <button onClick={onUpgrade} style={{ marginTop: "6px", fontSize: "10px", color: "#c9a96e", background: "none", border: "none", cursor: "pointer", fontFamily: "Georgia, serif", paddi
