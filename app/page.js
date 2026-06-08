@@ -4,6 +4,7 @@ import AgeGate from "./components/AgeGate";
 import AuthGate from "./components/AuthGate";
 import UserPanel from "./components/UserPanel";
 import PremiumModal from "./components/PremiumModal";
+import CookieBanner from "./components/CookieBanner";
 import { createClient } from "../lib/supabase";
 import { getT } from "../lib/translations";
 import { getPlan } from "../lib/payments";
@@ -554,6 +555,31 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* ── Cookie Banner ── */}
+      <CookieBanner />
+
+      {/* ── Legal Footer ── */}
+      {!isMobile && (
+        <div style={{
+          position: "fixed", bottom: "96px", left: 0, right: 0,
+          display: "flex", justifyContent: "center", gap: "16px",
+          fontSize: "10px", color: "#2e2820", zIndex: 100, pointerEvents: "none",
+        }}>
+          {[
+            ["Terms", "/legal/terms"],
+            ["Privacy", "/legal/privacy"],
+            ["Cookies", "/legal/cookies"],
+            ["Guidelines", "/legal/guidelines"],
+            ["Legal", "/legal"],
+          ].map(([label, href]) => (
+            <a key={href} href={href} style={{ color: "#2e2820", pointerEvents: "all", transition: "color 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.color = "#555"}
+              onMouseLeave={e => e.currentTarget.style.color = "#2e2820"}
+            >{label}</a>
+          ))}
+        </div>
+      )}
     </>
   );
 }
