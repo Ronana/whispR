@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "../../../lib/supabase";
+import { SkeletonTableRow, FadeIn } from "../../../components/Skeleton";
 
 const ROLES = ["listener", "pending_creator", "creator", "admin", "suspended"];
 const ROLE_COLORS = {
@@ -56,10 +57,16 @@ export default function UsersPage() {
       </div>
 
       {loading ? (
-        <p style={{ color: "#444", fontSize: "13px" }}>Loading…</p>
+        <div style={{ background: "#0d0b08", border: "1px solid #1a1710", borderRadius: "12px", overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <tbody>
+            {Array.from({ length: 8 }).map((_, i) => <SkeletonTableRow key={i} cols={4} />)}
+          </tbody>
+        </table>
+      </div>
       ) : (
         <>
-          <div style={{ background: "#0d0b08", border: "1px solid #1a1710", borderRadius: "12px", overflow: "hidden" }}>
+          <FadeIn><div style={{ background: "#0d0b08", border: "1px solid #1a1710", borderRadius: "12px", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #1a1710" }}>
@@ -105,7 +112,7 @@ export default function UsersPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></FadeIn>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px" }}>
             <button disabled={page === 0} onClick={() => setPage(p => p - 1)}

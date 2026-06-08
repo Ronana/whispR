@@ -27,6 +27,7 @@ export default function UserPanel({ user, liked, tracks, history, isPremium, pla
   const [settingsSection, setSettingsSection] = useState("audio");
   const [portalLoading, setPortalLoading] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
 
@@ -41,7 +42,7 @@ export default function UserPanel({ user, liked, tracks, history, isPremium, pla
     if (!user) return;
     const supabase = createClient();
     supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => { if (data) setProfile(data); });
+      .then(({ data }) => { if (data) setProfile(data); setProfileLoaded(true); });
   }, [user]);
 
   const updateSetting = (key, value) => {
@@ -120,7 +121,9 @@ export default function UserPanel({ user, liked, tracks, history, isPremium, pla
                 boxShadow: isPremium ? "0 0 12px rgba(201,169,110,0.4)" : "none",
                 cursor: "pointer",
               }} onClick={() => setShowEditModal(true)}>
-                {avatarUrl
+                {!profileLoaded
+                  ? <SkeletonAvatar size="100%" />
+                  : avatarUrl
                   ? <img src={avatarUrl} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : initials
                 }
@@ -137,7 +140,7 @@ export default function UserPanel({ user, liked, tracks, history, isPremium, pla
                 {isPendingCreator && <span style={{ fontSize: "9px", padding: "2px 7px", background: "rgba(100,100,60,0.2)", border: "1px solid #555", borderRadius: "10px", color: "#888" }}>PENDING</span>}
               </div>
               <p style={{ fontSize: "11px", color: "#555", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {profile?.username ? `@${profile.username}` : user?.email}
+                {!profileLoaded ? <Skeleton width="80px" height="10px" style={{ marginTop: "4px" }} /> : (profile?.username ? `@${profile.username}` : user?.email)}
               </p>
             </div>
           </div>

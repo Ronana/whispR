@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "../../../lib/supabase";
+import { Skeleton, FadeIn } from "../../../components/Skeleton";
 
 export default function ApplicationsPage() {
   const [apps, setApps] = useState([]);
@@ -53,11 +54,25 @@ export default function ApplicationsPage() {
       </div>
 
       {loading ? (
-        <p style={{ color: "#444", fontSize: "13px" }}>Loading…</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ background: "#0d0b08", border: "1px solid #1a1710", borderRadius: "12px", padding: "20px 22px" }}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
+                <Skeleton width="32px" height="32px" radius="50%" />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <Skeleton width="140px" height="12px" />
+                  <Skeleton width="80px" height="10px" />
+                </div>
+              </div>
+              <Skeleton width="100%" height="10px" />
+              <Skeleton width="80%" height="10px" style={{ marginTop: "6px" }} />
+            </div>
+          ))}
+        </div>
       ) : apps.length === 0 ? (
         <p style={{ color: "#444", fontSize: "13px" }}>No {filter} applications.</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <FadeIn><div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {apps.map(app => (
             <div key={app.id} style={{ background: "#0d0b08", border: "1px solid #1a1710", borderRadius: "12px", padding: "20px 22px" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
@@ -100,7 +115,7 @@ export default function ApplicationsPage() {
               </div>
             </div>
           ))}
-        </div>
+        </div></FadeIn>
       )}
     </div>
   );

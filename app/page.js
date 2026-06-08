@@ -8,6 +8,7 @@ import CookieBanner from "./components/CookieBanner";
 import { createClient } from "../lib/supabase";
 import { getT } from "../lib/translations";
 import { getPlan } from "../lib/payments";
+import { SkeletonTrackRow, SkeletonFeaturedCard, FadeIn } from "./components/Skeleton";
 
 const featured = [
   { id: 1, color: "#c9a96e" },
@@ -37,6 +38,7 @@ export default function Home() {
   const [history, setHistory] = useState([]);
   const [language, setLanguage] = useState("en");
   const [isPremium, setIsPremium] = useState(false);
+  const [tracksLoaded, setTracksLoaded] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [search, setSearch] = useState("");
   const [isMobile, setIsMobile] = useState(false);
@@ -225,6 +227,15 @@ export default function Home() {
         minHeight: "100vh", display: "flex", flexDirection: "column",
       }}>
         <style>{`
+          @keyframes whispr-fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+          .track-row { transition: background 0.2s ease; }
+          .track-row:hover { background: rgba(201,169,110,0.05) !important; }
+          .card:hover { transform: translateY(-2px); }
+          .play-btn { transition: transform 0.15s ease, background 0.2s ease !important; }
+          .play-btn:hover { transform: scale(1.08) !important; }
+          .play-btn:active { transform: scale(0.95) !important; }
+          .bottom-nav-btn { transition: color 0.2s ease !important; }
+
           * { box-sizing: border-box; margin: 0; padding: 0; }
           .track-row:hover { background: rgba(201,169,110,0.06) !important; }
           .play-btn:hover { transform: scale(1.08); }
@@ -346,14 +357,22 @@ export default function Home() {
             gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
             gap: "12px", marginBottom: isMobile ? "24px" : "40px",
           }}>
-            {featured.map((f, i) => (
+            {!tracksLoaded ? (
+              Array.from({ length: isMobile ? 1 : 3 }).map((_, i) => (
+                <SkeletonFeaturedCard key={i} />
+              ))
+            ) : featured.map((f, i) => (
               <div key={f.id} className="card" style={{
                 background: `linear-gradient(135deg, ${f.color}22, ${f.color}08)`,
                 border: `1px solid ${f.color}30`,
                 borderRadius: "12px", padding: isMobile ? "16px" : "20px",
-                cursor: "pointer", transition: "all 0.3s ease",
+                cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 display: "flex", alignItems: isMobile ? "center" : "block", gap: "12px",
-              }}>
+                animation: "whispr-fadein 0.4s ease forwards",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 24px ${f.color}20`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
                 <p style={{ fontSize: "14px", color: "#e8dcc8", marginBottom: isMobile ? "0" : "4px" }}>{t.featuredCards[i].title}</p>
                 {!isMobile && <p style={{ fontSize: "11px", color: "#888" }}>{t.featuredCards[i].subtitle}</p>}
               </div>
@@ -395,8 +414,10 @@ export default function Home() {
           )}
 
           {/* Tracks */}
-          {tracks.length === 0 ? (
-            <div style={{ padding: "40px 0", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>{t.loading}</div>
+          {!tracksLoaded ? (
+            <div>
+              {Array.from({ length: 6 }).map((_, i) => <SkeletonTrackRow key={i} isMobile={isMobile} />)}
+            </div>
           ) : filteredTracks.length === 0 ? (
             <div style={{ padding: "40px 0", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>
               No results for &ldquo;{search}&rdquo; —{" "}

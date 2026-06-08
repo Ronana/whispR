@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "../../lib/supabase";
+import { SkeletonStatCard, FadeIn } from "../../components/Skeleton";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -40,8 +41,11 @@ export default function AdminDashboard() {
       <p style={{ fontSize: "12px", color: "#555", marginBottom: "28px" }}>Platform overview</p>
 
       {!stats ? (
-        <p style={{ color: "#444", fontSize: "13px" }}>Loading…</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px" }}>
+          {Array.from({ length: 7 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
       ) : (
+        <FadeIn>
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px", marginBottom: "32px" }}>
             <StatCard label="Total Users" value={stats.totalUsers} />
@@ -62,6 +66,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </>
+        </FadeIn>
       )}
     </div>
   );
