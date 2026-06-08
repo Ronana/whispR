@@ -29,7 +29,6 @@ export default function Home() {
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState({});
   const [activeCategory, setActiveCategory] = useState(null);
-  const [search, setSearch] = useState('');
   const [activeNav, setActiveNav] = useState("home");
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -38,10 +37,18 @@ export default function Home() {
   const [language, setLanguage] = useState("en");
   const [isPremium, setIsPremium] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [search, setSearch] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
 
   const audioRef = useRef(null);
 
-  // Load saved language on mount
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem("whispr_settings");
@@ -54,10 +61,9 @@ export default function Home() {
 
   const t = getT(language);
   const plan = getPlan(language);
+  const clearSearch = () => setSearch("");
 
   useEffect(() => { setActiveCategory(null); }, [language]);
-
-  const clearSearch = () => setSearch('');
 
   const handleAgeConfirm = useCallback(() => setAgeConfirmed(true), []);
   const handleAuth = useCallback(() => {
@@ -85,28 +91,18 @@ export default function Home() {
     });
   }, []);
 
-  // Load subscription status
   useEffect(() => {
     if (!user) { setIsPremium(false); return; }
     const supabase = createClient();
-    supabase.from("subscriptions")
-      .select("status")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setIsPremium(data?.status === "active");
-      });
+    supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => setIsPremium(data?.status === "active"));
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
     supabase.from("likes").select("track_id").eq("user_id", user.id).then(({ data }) => {
-      if (data) {
-        const map = {};
-        data.forEach(r => { map[r.track_id] = true; });
-        setLiked(map);
-      }
+      if (data) { const map = {}; data.forEach(r => { map[r.track_id] = true; }); setLiked(map); }
     });
     supabase.from("listening_history").select("track_id").eq("user_id", user.id)
       .order("played_at", { ascending: false }).limit(20)
@@ -125,8 +121,7 @@ export default function Home() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !activeTrack) return;
-    audio.src = activeTrack.audio_url;
-    audio.load();
+    audio.src = activeTrack.audio_url; audio.load();
     setCurrentTime(0); setDuration(0);
     if (playing) audio.play().catch(() => {});
   }, [activeTrack]);
@@ -146,13 +141,8 @@ export default function Home() {
   }, [user]);
 
   const handlePlay = (track) => {
-    if (activeTrack?.id === track.id) {
-      setPlaying(!playing);
-    } else {
-      setActiveTrack(track);
-      setPlaying(true);
-      recordHistory(track);
-    }
+    if (activeTrack?.id === track.id) setPlaying(!playing);
+    else { setActiveTrack(track); setPlaying(true); recordHistory(track); }
   };
 
   const handleSeek = (e) => {
@@ -181,11 +171,8 @@ export default function Home() {
     setLiked(l => ({ ...l, [track.id]: !isLiked }));
     if (!user) return;
     const supabase = createClient();
-    if (isLiked) {
-      await supabase.from("likes").delete().eq("user_id", user.id).eq("track_id", track.id);
-    } else {
-      await supabase.from("likes").insert({ user_id: user.id, track_id: track.id });
-    }
+    if (isLiked) await supabase.from("likes").delete().eq("user_id", user.id).eq("track_id", track.id);
+    else await supabase.from("likes").insert({ user_id: user.id, track_id: track.id });
   };
 
   const handleDownload = async (track) => {
@@ -196,8 +183,8 @@ export default function Home() {
     a.click();
   };
 
-  const query = search.trim().toLowerCase();
   const activeCat = activeCategory ?? t.categories[0];
+  const query = search.trim().toLowerCase();
   const filteredTracks = (activeCat === t.categories[0]
     ? tracks
     : tracks.filter(tr => tr.category === activeCat))
@@ -205,9 +192,11 @@ export default function Home() {
 
   const currentTrack = activeTrack || tracks[2] || tracks[0];
   const progress = duration ? (currentTime / duration) * 100 : 0;
-
   const initials = (user?.user_metadata?.full_name || user?.email || "?")
     .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+  // Bottom padding: player (96px) + mobile bottom nav (56px) if mobile
+  const mainPaddingBottom = isMobile ? "168px" : "120px";
 
   if (user === undefined) return null;
 
@@ -217,24 +206,16 @@ export default function Home() {
       {ageConfirmed && !user && <AuthGate onAuth={handleAuth} />}
       {panelOpen && user && (
         <UserPanel
-          user={user}
-          liked={liked}
-          tracks={tracks}
-          history={history}
-          isPremium={isPremium}
-          onClose={() => setPanelOpen(false)}
-          onSignOut={handleSignOut}
+          user={user} liked={liked} tracks={tracks} history={history}
+          isPremium={isPremium} plan={plan}
+          onClose={() => setPanelOpen(false)} onSignOut={handleSignOut}
           onLanguageChange={handleLanguageChange}
-          plan={plan}
           onUpgrade={() => { setPanelOpen(false); setShowPremiumModal(true); }}
-          t={t}
+          t={t} isMobile={isMobile}
         />
       )}
       {showPremiumModal && (
-        <PremiumModal language={language} plan={plan}
-          user={user}
-          onClose={() => setShowPremiumModal(false)}
-        />
+        <PremiumModal user={user} language={language} plan={plan} onClose={() => setShowPremiumModal(false)} />
       )}
 
       <div style={{
@@ -250,36 +231,45 @@ export default function Home() {
           .cat-pill:hover { border-color: #c9a96e !important; color: #c9a96e !important; }
           .card:hover { transform: translateY(-3px); }
           .avatar-btn:hover { box-shadow: 0 0 16px rgba(201,169,110,0.4) !important; }
+          .premium-btn:hover { opacity: 0.85; }
           .search-input:focus { border-color: #c9a96e88 !important; outline: none; }
           .search-clear:hover { color: #c9a96e !important; }
-          .premium-btn:hover { background: linear-gradient(135deg, #e8c080, #c9a96e) !important; }
-          .dl-btn:hover { color: #c9a96e !important; }
+          .bottom-nav-btn:hover { color: #c9a96e !important; }
           @keyframes wave { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }
+          ::-webkit-scrollbar { width: 4px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background: #2a2418; border-radius: 2px; }
         `}</style>
 
-        {/* Nav */}
+        {/* ── Top Nav ── */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "18px 28px", borderBottom: "1px solid #1e1a14",
+          padding: isMobile ? "14px 16px" : "18px 28px",
+          borderBottom: "1px solid #1e1a14",
           background: "#0d0b08", position: "sticky", top: 0, zIndex: 100,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ width: "32px", height: "32px", background: "linear-gradient(135deg, #c9a96e, #8c6030)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>〜</div>
-            <span style={{ fontSize: "20px", color: "#e8dcc8" }}>Whisp<span style={{ color: "#c9a96e", fontWeight: "bold" }}>R</span></span>
+            <span style={{ fontSize: isMobile ? "18px" : "20px", color: "#e8dcc8" }}>Whisp<span style={{ color: "#c9a96e", fontWeight: "bold" }}>R</span></span>
           </div>
-          <div style={{ display: "flex", gap: "24px" }}>
-            {["home", "discover", "library"].map(nav => (
-              <button key={nav} className="nav-item" onClick={() => setActiveNav(nav)} style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: activeNav === nav ? "#c9a96e" : "#888",
-                fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase",
-                fontFamily: "inherit",
-                borderBottom: activeNav === nav ? "1px solid #c9a96e" : "1px solid transparent",
-                paddingBottom: "2px", transition: "color 0.2s",
-              }}>{t.nav[nav]}</button>
-            ))}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+
+          {/* Desktop nav links */}
+          {!isMobile && (
+            <div style={{ display: "flex", gap: "24px" }}>
+              {["home", "discover", "library"].map(nav => (
+                <button key={nav} className="nav-item" onClick={() => setActiveNav(nav)} style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: activeNav === nav ? "#c9a96e" : "#888",
+                  fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase",
+                  fontFamily: "inherit",
+                  borderBottom: activeNav === nav ? "1px solid #c9a96e" : "1px solid transparent",
+                  paddingBottom: "2px", transition: "color 0.2s",
+                }}>{t.nav[nav]}</button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
             {user && (
               <button className="avatar-btn" onClick={() => setPanelOpen(true)} style={{
                 width: "34px", height: "34px", borderRadius: "50%",
@@ -289,50 +279,31 @@ export default function Home() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "12px", fontWeight: "bold", color: "#0a0806", fontFamily: "inherit",
                 boxShadow: isPremium ? "0 0 14px rgba(201,169,110,0.5)" : "0 0 10px rgba(201,169,110,0.2)",
-                transition: "box-shadow 0.2s", position: "relative",
+                transition: "box-shadow 0.2s", position: "relative", flexShrink: 0,
               }}>
                 {initials}
                 {isPremium && (
-                  <span style={{
-                    position: "absolute", top: "-4px", right: "-4px",
-                    fontSize: "9px", background: "#c9a96e", color: "#0a0806",
-                    borderRadius: "50%", width: "14px", height: "14px",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>♛</span>
+                  <span style={{ position: "absolute", top: "-4px", right: "-4px", fontSize: "9px", background: "#c9a96e", color: "#0a0806", borderRadius: "50%", width: "14px", height: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>♛</span>
                 )}
               </button>
             )}
-            <button
-              className="premium-btn"
-              onClick={() => setShowPremiumModal(true)}
-              style={{
-                background: isPremium
-                  ? "transparent"
-                  : "linear-gradient(135deg, #c9a96e, #a07840)",
-                border: isPremium ? "1px solid #c9a96e44" : "none",
-                borderRadius: "20px", padding: "8px 20px",
-                color: isPremium ? "#c9a96e" : "#0d0b08",
-                fontSize: "11px", letterSpacing: "0.1em", fontWeight: "bold",
-                cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
-              }}
-            >
-              {isPremium ? "♛ PREMIUM" : t.premium}
+            <button className="premium-btn" onClick={() => setShowPremiumModal(true)} style={{
+              background: isPremium ? "transparent" : "linear-gradient(135deg, #c9a96e, #a07840)",
+              border: isPremium ? "1px solid #c9a96e44" : "none",
+              borderRadius: "20px", padding: isMobile ? "6px 12px" : "8px 20px",
+              color: isPremium ? "#c9a96e" : "#0d0b08",
+              fontSize: "10px", letterSpacing: "0.1em", fontWeight: "bold",
+              cursor: "pointer", fontFamily: "inherit", transition: "opacity 0.2s", flexShrink: 0,
+            }}>
+              {isPremium ? "♛" : (isMobile ? "PRO" : t.premium)}
             </button>
           </div>
         </div>
 
-
-        {/* Search bar */}
-        <div style={{
-          padding: "12px 28px",
-          borderBottom: "1px solid #1e1a14",
-          background: "#0d0b08",
-        }}>
-          <div style={{ position: "relative", maxWidth: "480px" }}>
-            <span style={{
-              position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)",
-              fontSize: "14px", color: "#444", pointerEvents: "none",
-            }}>🔍</span>
+        {/* ── Search bar ── */}
+        <div style={{ padding: isMobile ? "10px 16px" : "12px 28px", borderBottom: "1px solid #1e1a14", background: "#0d0b08" }}>
+          <div style={{ position: "relative", maxWidth: isMobile ? "100%" : "480px" }}>
+            <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "14px", color: "#444", pointerEvents: "none" }}>🔍</span>
             <input
               className="search-input"
               value={search}
@@ -341,50 +312,61 @@ export default function Home() {
               style={{
                 width: "100%", background: "#1a1710",
                 border: "1px solid #2a2418", borderRadius: "20px",
-                padding: "9px 36px 9px 36px",
-                color: "#e8dcc8", fontSize: "13px",
+                padding: "9px 36px", color: "#e8dcc8",
+                fontSize: isMobile ? "16px" : "13px",
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 transition: "border-color 0.2s",
               }}
             />
             {search && (
-              <button
-                className="search-clear"
-                onClick={clearSearch}
-                style={{
-                  position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
-                  background: "none", border: "none", color: "#555",
-                  cursor: "pointer", fontSize: "16px", lineHeight: 1,
-                  transition: "color 0.2s",
-                }}
-              >✕</button>
+              <button className="search-clear" onClick={clearSearch} style={{
+                position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", color: "#555",
+                cursor: "pointer", fontSize: "16px", lineHeight: 1, transition: "color 0.2s",
+              }}>✕</button>
             )}
           </div>
         </div>
 
-        {/* Main */}
-        <div style={{ flex: 1, overflow: "auto", padding: "28px 28px 120px" }}>
-          <div style={{ marginBottom: "36px" }}>
+        {/* ── Main content ── */}
+        <div style={{ flex: 1, overflow: "auto", padding: isMobile ? `20px 16px ${mainPaddingBottom}` : `28px 28px ${mainPaddingBottom}` }}>
+
+          {/* Hero */}
+          <div style={{ marginBottom: isMobile ? "24px" : "36px" }}>
             <p style={{ fontSize: "11px", letterSpacing: "0.2em", color: "#888", marginBottom: "6px", textTransform: "uppercase" }}>{t.greeting}</p>
-            <h1 style={{ fontSize: "28px", fontWeight: "normal", color: "#e8dcc8" }}>
+            <h1 style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: "normal", color: "#e8dcc8" }}>
               {t.hero} <span style={{ color: "#c9a96e", fontStyle: "italic" }}>{t.heroCta}</span>
             </h1>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "40px" }}>
+          {/* Featured cards — 1 col mobile, 3 col desktop */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gap: "12px", marginBottom: isMobile ? "24px" : "40px",
+          }}>
             {featured.map((f, i) => (
               <div key={f.id} className="card" style={{
                 background: `linear-gradient(135deg, ${f.color}22, ${f.color}08)`,
                 border: `1px solid ${f.color}30`,
-                borderRadius: "12px", padding: "20px", cursor: "pointer", transition: "all 0.3s ease",
+                borderRadius: "12px", padding: isMobile ? "16px" : "20px",
+                cursor: "pointer", transition: "all 0.3s ease",
+                display: "flex", alignItems: isMobile ? "center" : "block", gap: "12px",
               }}>
-                <p style={{ fontSize: "14px", color: "#e8dcc8", marginBottom: "4px" }}>{t.featuredCards[i].title}</p>
-                <p style={{ fontSize: "11px", color: "#888" }}>{t.featuredCards[i].subtitle}</p>
+                <p style={{ fontSize: "14px", color: "#e8dcc8", marginBottom: isMobile ? "0" : "4px" }}>{t.featuredCards[i].title}</p>
+                {!isMobile && <p style={{ fontSize: "11px", color: "#888" }}>{t.featuredCards[i].subtitle}</p>}
               </div>
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" }}>
+          {/* Category pills — horizontal scroll on mobile */}
+          <div style={{
+            display: "flex", gap: "8px", marginBottom: "20px",
+            overflowX: isMobile ? "auto" : "visible",
+            flexWrap: isMobile ? "nowrap" : "wrap",
+            paddingBottom: isMobile ? "4px" : "0",
+            WebkitOverflowScrolling: "touch",
+          }}>
             {t.categories.map(cat => (
               <button key={cat} className="cat-pill" onClick={() => setActiveCategory(cat)} style={{
                 background: activeCat === cat ? "rgba(201,169,110,0.15)" : "transparent",
@@ -393,34 +375,75 @@ export default function Home() {
                 color: activeCat === cat ? "#c9a96e" : "#888",
                 fontSize: "11px", letterSpacing: "0.12em",
                 cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+                whiteSpace: "nowrap", flexShrink: 0,
               }}>{cat.toUpperCase()}</button>
             ))}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px" }}>
-            <h2 style={{ fontSize: "15px", fontWeight: "normal", letterSpacing: "0.08em", color: "#c9a96e" }}>{t.featured.title}</h2>
+          {/* Track list header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "14px" }}>
+            <h2 style={{ fontSize: "14px", fontWeight: "normal", letterSpacing: "0.08em", color: "#c9a96e" }}>{t.featured.title}</h2>
             <span style={{ fontSize: "11px", color: "#555", letterSpacing: "0.1em", cursor: "pointer" }}>{t.featured.seeAll}</span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px 32px", padding: "8px 14px", fontSize: "10px", color: "#555", letterSpacing: "0.12em", borderBottom: "1px solid #1a1710" }}>
-            <span>#</span><span>{t.cols.title}</span><span>{t.cols.creator}</span><span>{t.cols.category}</span><span>{t.cols.duration}</span><span></span><span></span>
-          </div>
+          {/* Column headers — hidden on mobile */}
+          {!isMobile && (
+            <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px 32px", padding: "8px 14px", fontSize: "10px", color: "#555", letterSpacing: "0.12em", borderBottom: "1px solid #1a1710" }}>
+              <span>#</span><span>{t.cols.title}</span><span>{t.cols.creator}</span><span>{t.cols.category}</span><span>{t.cols.duration}</span><span></span><span></span>
+            </div>
+          )}
 
+          {/* Tracks */}
           {tracks.length === 0 ? (
-            <div style={{ padding: "40px 14px", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>{t.loading}</div>
+            <div style={{ padding: "40px 0", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>{t.loading}</div>
           ) : filteredTracks.length === 0 ? (
-            <div style={{ padding: "40px 14px", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>
-              No results for &ldquo;{search}&rdquo; — <button onClick={clearSearch} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "inherit", fontSize: "13px", fontStyle: "italic" }}>clear search</button>
+            <div style={{ padding: "40px 0", textAlign: "center", color: "#444", fontSize: "13px", fontStyle: "italic" }}>
+              No results for &ldquo;{search}&rdquo; —{" "}
+              <button onClick={clearSearch} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "inherit", fontSize: "13px", fontStyle: "italic" }}>clear search</button>
             </div>
           ) : filteredTracks.map((track) => {
             const isActive = activeTrack?.id === track.id;
             const isPlaying = isActive && playing;
+
+            if (isMobile) {
+              return (
+                <div key={track.id} className="track-row" style={{
+                  display: "flex", alignItems: "center", gap: "12px",
+                  padding: "14px 4px", borderBottom: "1px solid #1a1710",
+                  background: isActive ? "rgba(201,169,110,0.08)" : "transparent",
+                  transition: "background 0.2s",
+                }}>
+                  <button className="play-btn" onClick={() => handlePlay(track)} style={{
+                    width: "40px", height: "40px", borderRadius: "50%", flexShrink: 0,
+                    background: isActive ? "#c9a96e" : "rgba(201,169,110,0.15)",
+                    border: "none", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: isActive ? "#0d0b08" : "#c9a96e", fontSize: "14px",
+                  }}>{isPlaying ? "⏸" : "▶"}</button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "14px", color: isActive ? "#c9a96e" : "#e8dcc8", fontStyle: isActive ? "italic" : "normal", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.title}</span>
+                      {track.is_new && <span style={{ fontSize: "9px", padding: "1px 5px", background: "rgba(201,169,110,0.2)", borderRadius: "8px", color: "#c9a96e", flexShrink: 0 }}>NEW</span>}
+                    </div>
+                    <p style={{ fontSize: "11px", color: "#666", marginTop: "2px" }}>{track.creator} · {track.duration}</p>
+                    {isActive && isPlaying && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "2px", height: "12px", marginTop: "4px" }}>
+                        {Array.from({ length: 12 }).map((_, j) => (
+                          <div key={j} style={{ width: "2px", borderRadius: "1px", background: "#c9a96e", height: `${Math.random() * 60 + 20}%`, animation: `wave ${0.4 + (j % 5) * 0.1}s ease-in-out infinite alternate`, animationDelay: `${j * 0.04}s` }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => handleLike(track)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: liked[track.id] ? "#c9a96e" : "#444", flexShrink: 0, padding: "4px" }}>♥</button>
+                </div>
+              );
+            }
+
             return (
               <div key={track.id} className="track-row" style={{
                 display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px 32px",
                 padding: "12px 14px", borderRadius: "8px", alignItems: "center",
-                background: isActive ? "rgba(201,169,110,0.08)" : "transparent",
-                transition: "background 0.2s",
+                background: isActive ? "rgba(201,169,110,0.08)" : "transparent", transition: "background 0.2s",
               }}>
                 <button className="play-btn" onClick={() => handlePlay(track)} style={{
                   width: "24px", height: "24px", borderRadius: "50%",
@@ -438,12 +461,7 @@ export default function Home() {
                   {isActive && (
                     <div style={{ display: "flex", alignItems: "center", gap: "2px", height: "16px", marginTop: "4px" }}>
                       {Array.from({ length: 16 }).map((_, j) => (
-                        <div key={j} style={{
-                          width: "2px", borderRadius: "2px", background: "#c9a96e",
-                          height: `${Math.random() * 60 + 20}%`,
-                          animation: isPlaying ? `wave ${0.4 + (j % 5) * 0.1}s ease-in-out infinite alternate` : "none",
-                          animationDelay: `${j * 0.03}s`,
-                        }} />
+                        <div key={j} style={{ width: "2px", borderRadius: "2px", background: "#c9a96e", height: `${Math.random() * 60 + 20}%`, animation: isPlaying ? `wave ${0.4 + (j % 5) * 0.1}s ease-in-out infinite alternate` : "none", animationDelay: `${j * 0.03}s` }} />
                       ))}
                     </div>
                   )}
@@ -453,15 +471,7 @@ export default function Home() {
                 <span style={{ fontSize: "10px", color: "#666" }}>{track.category}</span>
                 <span style={{ fontSize: "12px", color: "#555" }}>{track.duration}</span>
                 <button onClick={() => handleLike(track)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: liked[track.id] ? "#c9a96e" : "#555" }}>♥</button>
-                <button
-                  className="dl-btn"
-                  onClick={() => handleDownload(track)}
-                  title={isPremium ? "Download" : "Premium feature"}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    fontSize: "13px", color: "#333", transition: "color 0.2s",
-                  }}
-                >
+                <button onClick={() => handleDownload(track)} title={isPremium ? "Download" : "Premium feature"} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#333", transition: "color 0.2s" }}>
                   {isPremium ? "⬇" : "🔒"}
                 </button>
               </div>
@@ -469,42 +479,78 @@ export default function Home() {
           })}
         </div>
 
-        {/* Player */}
+        {/* ── Mobile bottom nav bar ── */}
+        {isMobile && (
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0,
+            height: "56px",
+            background: "#0a0806", borderTop: "1px solid #1e1a14",
+            display: "flex", alignItems: "center", justifyContent: "space-around",
+            zIndex: 198, paddingBottom: "env(safe-area-inset-bottom)",
+          }}>
+            {[
+              { key: "home", icon: "⌂", label: t.nav.home },
+              { key: "discover", icon: "◎", label: t.nav.discover },
+              { key: "library", icon: "♫", label: t.nav.library },
+            ].map(({ key, icon, label }) => (
+              <button key={key} className="bottom-nav-btn" onClick={() => setActiveNav(key)} style={{
+                flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px",
+                background: "none", border: "none", cursor: "pointer", fontFamily: "inherit",
+                color: activeNav === key ? "#c9a96e" : "#555",
+                fontSize: "10px", letterSpacing: "0.08em", padding: "6px 0",
+                transition: "color 0.2s",
+              }}>
+                <span style={{ fontSize: "18px", lineHeight: 1 }}>{icon}</span>
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Player bar ── */}
         <div style={{
-          position: "fixed", bottom: 0, left: 0, right: 0,
+          position: "fixed",
+          bottom: isMobile ? "56px" : "0",
+          left: 0, right: 0,
           background: "#100e0a", borderTop: "1px solid #2a2418",
-          padding: "14px 28px", display: "flex", flexDirection: "column",
-          gap: "10px", zIndex: 200,
+          padding: isMobile ? "10px 16px" : "14px 28px",
+          display: "flex", flexDirection: "column", gap: isMobile ? "8px" : "10px",
+          zIndex: 199,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ fontSize: "11px", color: "#555", minWidth: "36px" }}>{formatTime(currentTime)}</span>
-            <div onClick={handleSeek} style={{ flex: 1, height: "3px", background: "#2a2418", borderRadius: "2px", cursor: "pointer" }}>
+          {/* Progress bar */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "11px", color: "#555", minWidth: "32px" }}>{formatTime(currentTime)}</span>
+            <div onClick={handleSeek} style={{ flex: 1, height: isMobile ? "4px" : "3px", background: "#2a2418", borderRadius: "2px", cursor: "pointer" }}>
               <div style={{ height: "100%", borderRadius: "2px", width: `${progress}%`, background: "linear-gradient(90deg, #c9a96e, #e8c080)", transition: "width 0.1s" }} />
             </div>
-            <span style={{ fontSize: "11px", color: "#555", minWidth: "36px" }}>{formatTime(duration)}</span>
+            <span style={{ fontSize: "11px", color: "#555", minWidth: "32px", textAlign: "right" }}>{formatTime(duration)}</span>
           </div>
+
+          {/* Controls */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: "13px", color: "#e8dcc8", fontStyle: "italic" }}>{currentTrack?.title}</p>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: isMobile ? "14px" : "13px", color: "#e8dcc8", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentTrack?.title}</p>
               <p style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{currentTrack?.creator}</p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-              <button onClick={handlePrev} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏮</button>
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "24px" : "20px" }}>
+              <button onClick={handlePrev} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: isMobile ? "20px" : "16px", padding: "4px" }}>⏮</button>
               <button onClick={() => activeTrack ? setPlaying(!playing) : tracks[0] && handlePlay(tracks[0])} style={{
-                width: "44px", height: "44px", borderRadius: "50%",
+                width: isMobile ? "50px" : "44px", height: isMobile ? "50px" : "44px", borderRadius: "50%",
                 background: "linear-gradient(135deg, #c9a96e, #a07840)",
-                border: "none", cursor: "pointer", fontSize: "18px",
+                border: "none", cursor: "pointer", fontSize: isMobile ? "20px" : "18px",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#0d0b08", boxShadow: "0 0 20px rgba(201,169,110,0.3)",
               }}>{playing ? "⏸" : "▶"}</button>
-              <button onClick={handleNext} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "16px" }}>⏭</button>
+              <button onClick={handleNext} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: isMobile ? "20px" : "16px", padding: "4px" }}>⏭</button>
             </div>
-            <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "14px", color: "#666" }}>♪</span>
-              <div style={{ width: "80px", height: "3px", background: "#2a2418", borderRadius: "2px" }}>
-                <div style={{ width: "70%", height: "100%", background: "#c9a96e", borderRadius: "2px" }} />
+            {!isMobile && (
+              <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "14px", color: "#666" }}>♪</span>
+                <div style={{ width: "80px", height: "3px", background: "#2a2418", borderRadius: "2px" }}>
+                  <div style={{ width: "70%", height: "100%", background: "#c9a96e", borderRadius: "2px" }} />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

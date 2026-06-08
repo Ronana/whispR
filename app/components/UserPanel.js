@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS = {
   language: "en",
 };
 
-export default function UserPanel({ user, liked, tracks, history, isPremium, plan, onClose, onSignOut, onLanguageChange, onUpgrade, t }) {
+export default function UserPanel({ user, liked, tracks, history, isPremium, plan, onClose, onSignOut, onLanguageChange, onUpgrade, t, isMobile = false }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [profileTab, setProfileTab] = useState("liked");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -95,7 +95,7 @@ export default function UserPanel({ user, liked, tracks, history, isPremium, pla
 
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300 }} />
       <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0, width: "340px",
+        position: "fixed", top: 0, right: 0, bottom: 0, width: isMobile ? "100vw" : "340px",
         background: "#100e0a", borderLeft: "1px solid #2a2418",
         zIndex: 301, display: "flex", flexDirection: "column",
         fontFamily: "Georgia, 'Times New Roman', serif",
