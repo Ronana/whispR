@@ -93,6 +93,7 @@ export default function Home() {
     supabase.from("tracks").select("*").order("id").then(({ data, error }) => {
       if (!error && data) {
         setTracks(data);
+        setTracksLoaded(true);
         // Load creator profiles for avatars + links
         supabase.from("profiles")
           .select("display_name, username, avatar_url")
