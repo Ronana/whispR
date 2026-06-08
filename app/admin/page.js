@@ -29,7 +29,7 @@ export default function AdminDashboard() {
         supabase.from("reports").select("*", { count: "exact", head: true }).eq("status", "pending"),
       ]);
 
-      const totalPlays = playsData?.reduce((sum, t) => sum + (t.plays || 0), 0) || 0;
+      const totalPlays = playsData?.reduce((sum, t) => sum + (Number(t.plays) || 0), 0) || 0;
       setStats({ totalUsers, totalTracks, totalSubs, pendingApps, newUsers, totalPlays, pendingReports });
     })();
   }, []);
