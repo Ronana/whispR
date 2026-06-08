@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from "react";
 import { createClient } from "../../lib/supabase";
+import { openBillingPortal } from "../../lib/payments";
 
 const DEFAULT_SETTINGS = {
   audioQuality: "High",
@@ -16,11 +17,12 @@ const DEFAULT_SETTINGS = {
   language: "en",
 };
 
-export default function UserPanel({ user, liked, tracks, history, onClose, onSignOut, onLanguageChange, t }) {
+export default function UserPanel({ user, liked, tracks, history, isPremium, onClose, onSignOut, onLanguageChange, onUpgrade, t }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [profileTab, setProfileTab] = useState("liked");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsSection, setSettingsSection] = useState("audio");
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -38,7 +40,6 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
 
   const likedTracks = tracks.filter(tr => liked[tr.id]);
   const historyTracks = tracks.filter(tr => history.includes(tr.id));
-
   const s = t.settings;
 
   const handleSignOut = async () => {
@@ -46,6 +47,15 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
     await supabase.auth.signOut();
     onSignOut();
     onClose();
+  };
+
+  const handleManageBilling = async () => {
+    setPortalLoading(true);
+    try {
+      await openBillingPortal({ userId: user.id });
+    } catch {
+      setPortalLoading(false);
+    }
   };
 
   return (
@@ -63,21 +73,70 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
             <span style={{ fontSize: "13px", color: "#c9a96e", letterSpacing: "0.1em" }}>{t.profile.title}</span>
             <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: "18px" }}>✕</button>
           </div>
+
+          {/* Avatar + user info + premium badge */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-            <div style={{
-              width: "48px", height: "48px", borderRadius: "50%",
-              background: "linear-gradient(135deg, #c9a96e, #8c6030)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "16px", fontWeight: "bold", color: "#0a0806",
-            }}>
-              {(user?.user_metadata?.full_name || user?.email || "?")
-                .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+            <div style={{ position: "relative" }}>
+              <div style={{
+                width: "48px", height: "48px", borderRadius: "50%",
+                background: "linear-gradient(135deg, #c9a96e, #8c6030)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "16px", fontWeight: "bold", color: "#0a0806",
+                border: isPremium ? "2px solid #c9a96e" : "none",
+                boxShadow: isPremium ? "0 0 12px rgba(201,169,110,0.4)" : "none",
+              }}>
+                {(user?.user_metadata?.full_name || user?.email || "?")
+                  .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+              </div>
+              {isPremium && (
+                <span style={{
+                  position: "absolute", top: "-4px", right: "-4px",
+                  fontSize: "9px", background: "#c9a96e", color: "#0a0806",
+                  borderRadius: "50%", width: "16px", height: "16px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>♛</span>
+              )}
             </div>
-            <div>
-              <p style={{ fontSize: "14px", color: "#e8dcc8" }}>{user?.user_metadata?.full_name || "Listener"}</p>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <p style={{ fontSize: "14px", color: "#e8dcc8" }}>{user?.user_metadata?.full_name || "Listener"}</p>
+                {isPremium && (
+                  <span style={{
+                    fontSize: "9px", padding: "2px 7px",
+                    background: "rgba(201,169,110,0.15)",
+                    border: "1px solid #c9a96e44",
+                    borderRadius: "10px", color: "#c9a96e",
+                    letterSpacing: "0.08em",
+                  }}>PREMIUM</span>
+                )}
+              </div>
               <p style={{ fontSize: "11px", color: "#666" }}>{user?.email}</p>
             </div>
           </div>
+
+          {/* Premium CTA or manage button */}
+          {!isPremium ? (
+            <button onClick={onUpgrade} style={{
+              width: "100%", padding: "9px",
+              background: "linear-gradient(135deg, #c9a96e22, #8c603010)",
+              border: "1px solid #c9a96e44", borderRadius: "8px",
+              color: "#c9a96e", fontSize: "11px", letterSpacing: "0.1em",
+              cursor: "pointer", fontFamily: "inherit", marginBottom: "16px",
+            }}>
+              ♛ Upgrade to Premium — $9.99/mo
+            </button>
+          ) : (
+            <button onClick={handleManageBilling} disabled={portalLoading} style={{
+              width: "100%", padding: "9px",
+              background: "transparent",
+              border: "1px solid #2a2418", borderRadius: "8px",
+              color: "#555", fontSize: "11px", letterSpacing: "0.1em",
+              cursor: portalLoading ? "not-allowed" : "pointer", fontFamily: "inherit", marginBottom: "16px",
+            }}>
+              {portalLoading ? "Opening..." : "Manage Subscription"}
+            </button>
+          )}
+
           <div style={{ display: "flex", gap: "0" }}>
             {["profile", "settings"].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)} style={{
@@ -137,7 +196,6 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
 
           {activeTab === "settings" && (
             <>
-              {/* Settings Nav */}
               <div style={{ display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" }}>
                 {Object.entries(s.sections).map(([key, label]) => (
                   <button key={key} onClick={() => setSettingsSection(key)} style={{
@@ -151,18 +209,19 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
                 ))}
               </div>
 
-              {/* Audio */}
               {settingsSection === "audio" && (
                 <div>
                   <SettingSelect label={s.audio.label} desc={s.audio.desc}
-                    value={settings.audioQuality} options={s.audio.options}
-                    onChange={v => updateSetting("audioQuality", v)} />
+                    value={settings.audioQuality}
+                    options={isPremium ? s.audio.options : s.audio.options.slice(0, 2)}
+                    onChange={v => updateSetting("audioQuality", v)}
+                    premiumNote={!isPremium ? "Very High & Lossless require Premium" : null}
+                    onUpgrade={onUpgrade}
+                  />
                   <SettingToggle label={s.normalize.label} desc={s.normalize.desc}
                     value={settings.normalizeVolume} onChange={v => updateSetting("normalizeVolume", v)} />
                 </div>
               )}
-
-              {/* Playback */}
               {settingsSection === "playback" && (
                 <div>
                   <SettingToggle label={s.crossfade.label} desc={s.crossfade.desc}
@@ -171,8 +230,6 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
                     value={settings.autoplay} onChange={v => updateSetting("autoplay", v)} />
                 </div>
               )}
-
-              {/* Display */}
               {settingsSection === "display" && (
                 <div>
                   <SettingSelect label={s.theme.label} desc={s.theme.desc}
@@ -182,8 +239,6 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
                     value={settings.compactMode} onChange={v => updateSetting("compactMode", v)} />
                 </div>
               )}
-
-              {/* Privacy */}
               {settingsSection === "privacy" && (
                 <div>
                   <SettingToggle label={s.privateSession.label} desc={s.privateSession.desc}
@@ -196,27 +251,23 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
                     value={settings.personalisation} onChange={v => updateSetting("personalisation", v)} />
                 </div>
               )}
-
-              {/* Language */}
               {settingsSection === "language" && (
                 <div>
-                  <div style={{ marginBottom: "16px" }}>
-                    <p style={{ fontSize: "12px", color: "#c9a96e", marginBottom: "2px" }}>{s.language.label}</p>
-                    <p style={{ fontSize: "10px", color: "#555", marginBottom: "8px" }}>{s.language.desc}</p>
-                    <select
-                      value={settings.language}
-                      onChange={e => updateSetting("language", e.target.value)}
-                      style={{
-                        width: "100%", background: "#1a1710", border: "1px solid #2a2418",
-                        color: "#e8dcc8", borderRadius: "6px", padding: "8px 10px",
-                        fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer",
-                      }}
-                    >
-                      {s.language.options.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <p style={{ fontSize: "12px", color: "#c9a96e", marginBottom: "2px" }}>{s.language.label}</p>
+                  <p style={{ fontSize: "10px", color: "#555", marginBottom: "8px" }}>{s.language.desc}</p>
+                  <select
+                    value={settings.language}
+                    onChange={e => updateSetting("language", e.target.value)}
+                    style={{
+                      width: "100%", background: "#1a1710", border: "1px solid #2a2418",
+                      color: "#e8dcc8", borderRadius: "6px", padding: "8px 10px",
+                      fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer",
+                    }}
+                  >
+                    {s.language.options.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
               )}
             </>
@@ -229,7 +280,7 @@ export default function UserPanel({ user, liked, tracks, history, onClose, onSig
             width: "100%", padding: "10px", background: "transparent",
             border: "1px solid #2a2418", borderRadius: "8px",
             color: "#888", fontSize: "12px", letterSpacing: "0.1em",
-            cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+            cursor: "pointer", fontFamily: "inherit",
           }}>{t.signOut.toUpperCase()}</button>
         </div>
       </div>
@@ -259,7 +310,7 @@ function SettingToggle({ label, desc, value, onChange }) {
   );
 }
 
-function SettingSelect({ label, desc, value, options, onChange }) {
+function SettingSelect({ label, desc, value, options, onChange, premiumNote, onUpgrade }) {
   return (
     <div style={{ marginBottom: "16px" }}>
       <p style={{ fontSize: "12px", color: "#c9a96e", marginBottom: "2px" }}>{label}</p>
@@ -271,6 +322,13 @@ function SettingSelect({ label, desc, value, options, onChange }) {
       }}>
         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
       </select>
+      {premiumNote && (
+        <button onClick={onUpgrade} style={{
+          marginTop: "6px", fontSize: "10px", color: "#c9a96e",
+          background: "none", border: "none", cursor: "pointer",
+          fontFamily: "Georgia, serif", padding: 0,
+        }}>♛ {premiumNote}</button>
+      )}
     </div>
   );
 }

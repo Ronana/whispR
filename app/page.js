@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import AgeGate from "./components/AgeGate";
 import AuthGate from "./components/AuthGate";
 import UserPanel from "./components/UserPanel";
+import PremiumModal from "./components/PremiumModal";
 import { createClient } from "../lib/supabase";
 import { getT } from "../lib/translations";
 
@@ -33,6 +34,8 @@ export default function Home() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [language, setLanguage] = useState("en");
+  const [isPremium, setIsPremium] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   const audioRef = useRef(null);
 
@@ -49,10 +52,7 @@ export default function Home() {
 
   const t = getT(language);
 
-  // Reset active category when language changes (category names change)
-  useEffect(() => {
-    setActiveCategory(null);
-  }, [language]);
+  useEffect(() => { setActiveCategory(null); }, [language]);
 
   const handleAgeConfirm = useCallback(() => setAgeConfirmed(true), []);
   const handleAuth = useCallback(() => {
@@ -60,9 +60,7 @@ export default function Home() {
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
   }, []);
   const handleSignOut = useCallback(() => {
-    setUser(null);
-    setLiked({});
-    setHistory([]);
+    setUser(null); setLiked({}); setHistory([]); setIsPremium(false);
   }, []);
   const handleLanguageChange = useCallback((lang) => setLanguage(lang), []);
 
@@ -82,14 +80,27 @@ export default function Home() {
     });
   }, []);
 
+  // Load subscription status
+  useEffect(() => {
+    if (!user) { setIsPremium(false); return; }
+    const supabase = createClient();
+    supabase.from("subscriptions")
+      .select("status")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setIsPremium(data?.status === "active");
+      });
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
     supabase.from("likes").select("track_id").eq("user_id", user.id).then(({ data }) => {
       if (data) {
-        const likedMap = {};
-        data.forEach(r => { likedMap[r.track_id] = true; });
-        setLiked(likedMap);
+        const map = {};
+        data.forEach(r => { map[r.track_id] = true; });
+        setLiked(map);
       }
     });
     supabase.from("listening_history").select("track_id").eq("user_id", user.id)
@@ -111,8 +122,7 @@ export default function Home() {
     if (!audio || !activeTrack) return;
     audio.src = activeTrack.audio_url;
     audio.load();
-    setCurrentTime(0);
-    setDuration(0);
+    setCurrentTime(0); setDuration(0);
     if (playing) audio.play().catch(() => {});
   }, [activeTrack]);
 
@@ -173,6 +183,14 @@ export default function Home() {
     }
   };
 
+  const handleDownload = async (track) => {
+    if (!isPremium) { setShowPremiumModal(true); return; }
+    const a = document.createElement("a");
+    a.href = track.audio_url;
+    a.download = `${track.title} - ${track.creator}.mp3`;
+    a.click();
+  };
+
   const activeCat = activeCategory ?? t.categories[0];
   const filteredTracks = activeCat === t.categories[0]
     ? tracks
@@ -196,12 +214,21 @@ export default function Home() {
           liked={liked}
           tracks={tracks}
           history={history}
+          isPremium={isPremium}
           onClose={() => setPanelOpen(false)}
           onSignOut={handleSignOut}
           onLanguageChange={handleLanguageChange}
+          onUpgrade={() => { setPanelOpen(false); setShowPremiumModal(true); }}
           t={t}
         />
       )}
+      {showPremiumModal && (
+        <PremiumModal
+          user={user}
+          onClose={() => setShowPremiumModal(false)}
+        />
+      )}
+
       <div style={{
         fontFamily: "Georgia, 'Times New Roman', serif",
         background: "#0d0b08", color: "#e8dcc8",
@@ -215,6 +242,8 @@ export default function Home() {
           .cat-pill:hover { border-color: #c9a96e !important; color: #c9a96e !important; }
           .card:hover { transform: translateY(-3px); }
           .avatar-btn:hover { box-shadow: 0 0 16px rgba(201,169,110,0.4) !important; }
+          .premium-btn:hover { background: linear-gradient(135deg, #e8c080, #c9a96e) !important; }
+          .dl-btn:hover { color: #c9a96e !important; }
           @keyframes wave { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }
         `}</style>
 
@@ -245,18 +274,40 @@ export default function Home() {
               <button className="avatar-btn" onClick={() => setPanelOpen(true)} style={{
                 width: "34px", height: "34px", borderRadius: "50%",
                 background: "linear-gradient(135deg, #c9a96e, #8c6030)",
-                border: "none", cursor: "pointer",
+                border: isPremium ? "2px solid #c9a96e" : "none",
+                cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "12px", fontWeight: "bold", color: "#0a0806", fontFamily: "inherit",
-                boxShadow: "0 0 10px rgba(201,169,110,0.2)", transition: "box-shadow 0.2s",
-              }}>{initials}</button>
+                boxShadow: isPremium ? "0 0 14px rgba(201,169,110,0.5)" : "0 0 10px rgba(201,169,110,0.2)",
+                transition: "box-shadow 0.2s", position: "relative",
+              }}>
+                {initials}
+                {isPremium && (
+                  <span style={{
+                    position: "absolute", top: "-4px", right: "-4px",
+                    fontSize: "9px", background: "#c9a96e", color: "#0a0806",
+                    borderRadius: "50%", width: "14px", height: "14px",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>♛</span>
+                )}
+              </button>
             )}
-            <button style={{
-              background: "linear-gradient(135deg, #c9a96e, #a07840)", border: "none",
-              borderRadius: "20px", padding: "8px 20px", color: "#0d0b08",
-              fontSize: "11px", letterSpacing: "0.1em", fontWeight: "bold",
-              cursor: "pointer", fontFamily: "inherit",
-            }}>{t.premium}</button>
+            <button
+              className="premium-btn"
+              onClick={() => setShowPremiumModal(true)}
+              style={{
+                background: isPremium
+                  ? "transparent"
+                  : "linear-gradient(135deg, #c9a96e, #a07840)",
+                border: isPremium ? "1px solid #c9a96e44" : "none",
+                borderRadius: "20px", padding: "8px 20px",
+                color: isPremium ? "#c9a96e" : "#0d0b08",
+                fontSize: "11px", letterSpacing: "0.1em", fontWeight: "bold",
+                cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+              }}
+            >
+              {isPremium ? "♛ PREMIUM" : t.premium}
+            </button>
           </div>
         </div>
 
@@ -300,8 +351,8 @@ export default function Home() {
             <span style={{ fontSize: "11px", color: "#555", letterSpacing: "0.1em", cursor: "pointer" }}>{t.featured.seeAll}</span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px", padding: "8px 14px", fontSize: "10px", color: "#555", letterSpacing: "0.12em", borderBottom: "1px solid #1a1710" }}>
-            <span>#</span><span>{t.cols.title}</span><span>{t.cols.creator}</span><span>{t.cols.category}</span><span>{t.cols.duration}</span><span></span>
+          <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px 32px", padding: "8px 14px", fontSize: "10px", color: "#555", letterSpacing: "0.12em", borderBottom: "1px solid #1a1710" }}>
+            <span>#</span><span>{t.cols.title}</span><span>{t.cols.creator}</span><span>{t.cols.category}</span><span>{t.cols.duration}</span><span></span><span></span>
           </div>
 
           {tracks.length === 0 ? (
@@ -311,7 +362,7 @@ export default function Home() {
             const isPlaying = isActive && playing;
             return (
               <div key={track.id} className="track-row" style={{
-                display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px",
+                display: "grid", gridTemplateColumns: "32px 1fr 120px 80px 60px 40px 32px",
                 padding: "12px 14px", borderRadius: "8px", alignItems: "center",
                 background: isActive ? "rgba(201,169,110,0.08)" : "transparent",
                 transition: "background 0.2s",
@@ -347,6 +398,17 @@ export default function Home() {
                 <span style={{ fontSize: "10px", color: "#666" }}>{track.category}</span>
                 <span style={{ fontSize: "12px", color: "#555" }}>{track.duration}</span>
                 <button onClick={() => handleLike(track)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: liked[track.id] ? "#c9a96e" : "#555" }}>♥</button>
+                <button
+                  className="dl-btn"
+                  onClick={() => handleDownload(track)}
+                  title={isPremium ? "Download" : "Premium feature"}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    fontSize: "13px", color: "#333", transition: "color 0.2s",
+                  }}
+                >
+                  {isPremium ? "⬇" : "🔒"}
+                </button>
               </div>
             );
           })}
