@@ -693,4 +693,16 @@ export default function Home() {
             ["Terms", "/legal/terms"],
             ["Privacy", "/legal/privacy"],
             ["Cookies", "/legal/cookies"],
-            ["Guidelines", "/legal/guidelines"
+            ["Guidelines", "/legal/guidelines"],
+            ["Legal", "/legal"],
+          ].map(([label, href]) => (
+            <a key={href} href={href} style={{ color: "#2e2820", pointerEvents: "all", transition: "color 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.color = "#555"}
+              onMouseLeave={e => e.currentTarget.style.color = "#2e2820"}
+            >{label}</a>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
